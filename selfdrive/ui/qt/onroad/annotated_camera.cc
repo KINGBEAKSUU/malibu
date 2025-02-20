@@ -1100,9 +1100,6 @@ void AnnotatedCameraWidget::updateFrogPilotVariables(int alert_height, const UIS
 
   bool enableScreenRecorder = scene.screen_recorder && !mapOpen;
   screenRecorder->setVisible(enableScreenRecorder);
-  if (enableScreenRecorder) {
-    screenRecorder->updateScreen(scene.fps, scene.started);
-  }
 
   dashboardSpeedLimit = scene.dashboard_speed_limit * speedConversion;
   mapsSpeedLimit = scene.speed_limit_map * speedConversion;
