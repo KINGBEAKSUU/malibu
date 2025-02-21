@@ -48,13 +48,13 @@ qt_src = ["main.cc", "qt/sidebar.cc", "qt/body.cc",
           "qt/onroad/buttons.cc", "qt/onroad/alerts.cc"]
 
 frogpilot_src = ["../frogpilot/navigation/ui/maps_settings.cc", "../frogpilot/navigation/ui/navigation_functions.cc",
-                 "../frogpilot/navigation/ui/primeless_settings.cc", "../frogpilot/screenrecorder/omx_encoder.cc",
-                 "../frogpilot/screenrecorder/screenrecorder.cc", "../frogpilot/ui/qt/offroad/data_settings.cc",
-                 "../frogpilot/ui/qt/offroad/device_settings.cc", "../frogpilot/ui/qt/offroad/frogpilot_settings.cc",
-                 "../frogpilot/ui/qt/offroad/lateral_settings.cc", "../frogpilot/ui/qt/offroad/longitudinal_settings.cc",
-                 "../frogpilot/ui/qt/offroad/model_settings.cc", "../frogpilot/ui/qt/offroad/sounds_settings.cc",
-                 "../frogpilot/ui/qt/offroad/theme_settings.cc", "../frogpilot/ui/qt/offroad/utilities.cc",
-                 "../frogpilot/ui/qt/offroad/vehicle_settings.cc", "../frogpilot/ui/qt/offroad/visual_settings.cc"]
+                 "../frogpilot/navigation/ui/primeless_settings.cc", "../frogpilot/screenrecorder/screenrecorder.cc",
+                 "../frogpilot/ui/qt/offroad/data_settings.cc", "../frogpilot/ui/qt/offroad/device_settings.cc",
+                 "../frogpilot/ui/qt/offroad/frogpilot_settings.cc", "../frogpilot/ui/qt/offroad/lateral_settings.cc",
+                 "../frogpilot/ui/qt/offroad/longitudinal_settings.cc", "../frogpilot/ui/qt/offroad/model_settings.cc",
+                 "../frogpilot/ui/qt/offroad/sounds_settings.cc", "../frogpilot/ui/qt/offroad/theme_settings.cc",
+                 "../frogpilot/ui/qt/offroad/utilities.cc", "../frogpilot/ui/qt/offroad/vehicle_settings.cc",
+                 "../frogpilot/ui/qt/offroad/visual_settings.cc"]
 
 qt_src += frogpilot_src
 
@@ -98,8 +98,6 @@ if GetOption('extras'):
   qt_src.remove("main.cc")  # replaced by test_runner
   qt_env.Program('tests/test_translations', [asset_obj, 'tests/test_runner.cc', 'tests/test_translations.cc'] + qt_src, LIBS=qt_libs)
   qt_env.Program('tests/ui_snapshot', [asset_obj, "tests/ui_snapshot.cc"] + qt_src, LIBS=qt_libs)
-
-qt_env['CPPPATH'] += ["../frogpilot/screenrecorder/openmax/include/"]
 
 if GetOption('extras') and arch != "Darwin":
   # setup and factory resetter
