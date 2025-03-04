@@ -552,6 +552,9 @@ UIState::UIState(QObject *parent) : QObject(parent) {
     "wideRoadCameraState", "managerState", "navInstruction", "navRoute", "uiPlan", "clocks",
     "carControl", "liveTorqueParameters", "liveTracks", "frogpilotCarControl", "frogpilotCarState", "frogpilotDeviceState",
     "frogpilotNavigation", "frogpilotPlan",
+
+//TODO-FROG-CHERRY    "frogpilotPlan","naviData",
+
   });
 
   Params params;
