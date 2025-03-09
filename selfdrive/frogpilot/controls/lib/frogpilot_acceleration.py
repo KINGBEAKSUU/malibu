@@ -1,6 +1,18 @@
 #!/usr/bin/env python3
 import numpy as np
 
+def smooth_interp(x, xp, fp):
+    if x <= xp[0]:
+        return fp[0]
+    elif x >= xp[-1]:
+        return fp[-1]
+
+    for i in range(len(xp) - 1):
+        if xp[i] <= x < xp[i + 1]:
+            t = (x - xp[i]) / float(xp[i + 1] - xp[i])
+            return fp[i]*(1 - 3*t**2 + 2*t**3) + fp[i+1]*(3*t**2 - 2*t**3)
+    return fp[-1]
+
 from openpilot.selfdrive.controls.lib.longitudinal_planner import A_CRUISE_MIN, get_max_accel
 
 from openpilot.selfdrive.frogpilot.frogpilot_variables import CITY_SPEED_LIMIT
@@ -15,13 +27,13 @@ A_CRUISE_MAX_VALS_SPORT =      [1.5, 1.5, 1.25, 1.5, 1.5, 1.5, 2.0]
 A_CRUISE_MAX_VALS_SPORT_PLUS = [2.5, 2.5, 3.0, 2.5, 2.5, 2.5, 2.5]
 
 def get_max_accel_eco(v_ego):
-  return np.interp(v_ego, A_CRUISE_MAX_BP_CUSTOM, A_CRUISE_MAX_VALS_ECO)
+  return smooth_interp(v_ego, A_CRUISE_MAX_BP_CUSTOM, A_CRUISE_MAX_VALS_ECO)
 
 def get_max_accel_sport(v_ego):
-  return np.interp(v_ego, A_CRUISE_MAX_BP_CUSTOM, A_CRUISE_MAX_VALS_SPORT)
+  return smooth_interp(v_ego, A_CRUISE_MAX_BP_CUSTOM, A_CRUISE_MAX_VALS_SPORT)
 
 def get_max_accel_sport_plus(v_ego):
-  return np.interp(v_ego, A_CRUISE_MAX_BP_CUSTOM, A_CRUISE_MAX_VALS_SPORT_PLUS)
+  return smooth_interp(v_ego, A_CRUISE_MAX_BP_CUSTOM, A_CRUISE_MAX_VALS_SPORT_PLUS)
 
 def get_max_accel_low_speeds(max_accel, v_cruise):
   return np.interp(v_cruise, [0., CITY_SPEED_LIMIT / 2, CITY_SPEED_LIMIT], [max_accel / 4, max_accel / 2, max_accel])
