@@ -158,6 +158,7 @@ class LongControl:
 
     else:  # LongCtrlState.pid
       error = a_target - CS.aEgo
+      self.update_mpc_mode(self.experimental_mode)
       raw_output_accel = self.pid.update(error, speed=CS.vEgo, feedforward=a_target)
 
      
