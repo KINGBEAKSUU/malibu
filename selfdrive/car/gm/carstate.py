@@ -254,7 +254,7 @@ class CarState(CarStateBase):
 
     if CP.transmissionType == TransmissionType.direct:
       messages += [
-        ("EBCMRegenPaddle", 50),
+        ("EBCMRegenPaddle", 40),
         ("EVDriveMode", 0),
       ]
 

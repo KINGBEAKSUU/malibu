@@ -81,6 +81,8 @@ class CarController(CarControllerBase):
     hud_v_cruise = hud_control.setSpeed
     if hud_v_cruise > 70:
       hud_v_cruise = 0
+    press_regen_paddle = accel < -0.30
+    
 
     # Send CAN commands.
     can_sends = []
@@ -134,7 +136,6 @@ class CarController(CarControllerBase):
         at_full_stop = CC.longActive and CS.out.standstill
         near_stop = CC.longActive and (CS.out.vEgo < self.params.NEAR_STOP_BRAKE_PHASE)
         interceptor_gas_cmd = 0
-        press_regen_paddle = accel < -0.30
         if not CC.longActive:
           # ASCM sends max regen when not enabled
           self.apply_gas = self.params.INACTIVE_REGEN
@@ -142,7 +143,6 @@ class CarController(CarControllerBase):
         elif near_stop and stopping and not CC.cruiseControl.resume:
           self.apply_gas = self.params.INACTIVE_REGEN
           self.apply_brake = int(min(-100 * self.CP.stopAccel, self.params.MAX_BRAKE))
-          press_regen_paddle = True
         else:
           # Normal operation
           if self.CP.carFingerprint in EV_CAR:
@@ -181,9 +181,6 @@ class CarController(CarControllerBase):
             can_sends.extend(gmcan.create_gm_cc_spam_command(self.packer_pt, self, CS, actuators))
         if self.CP.enableGasInterceptor:
           can_sends.append(create_gas_interceptor_command(self.packer_pt, interceptor_gas_cmd, idx))
-        if self.CP.carFingerprint in CC_REGEN_PADDLE_CAR:
-          regen_paddle_value = 2 if press_regen_paddle else 0
-          can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN, regen_paddle_value))
         if self.CP.carFingerprint not in CC_ONLY_CAR:
           friction_brake_bus = CanBus.CHASSIS
           # GM Camera exceptions
@@ -268,6 +265,9 @@ class CarController(CarControllerBase):
     new_actuators.gas = self.apply_gas
     new_actuators.brake = self.apply_brake
     new_actuators.speed = self.apply_speed
+    if self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and self.frame % 2 == 0 and (self.frame // 2) % 5 != 3:
+            regen_paddle_value = 2 if press_regen_paddle else 0
+            can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN, regen_paddle_value))
 
     self.frame += 1
     return new_actuators, can_sends
