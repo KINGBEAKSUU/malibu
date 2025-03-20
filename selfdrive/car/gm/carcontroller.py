@@ -211,6 +211,10 @@ class CarController(CarControllerBase):
         # to keep accel steady for logs when not sending gas
         accel += self.accel_g
 
+      # Send regen paddle command at 40Hz if active
+      if self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and press_regen_paddle and self.frame % 2 == 0 and (self.frame // 2) % 5 != 3:
+        can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN))
+
       # Radar needs to know current speed and yaw rate (50hz),
       # and that ADAS is alive (10hz)
       if not self.CP.radarUnavailable:
@@ -265,9 +269,6 @@ class CarController(CarControllerBase):
     new_actuators.gas = self.apply_gas
     new_actuators.brake = self.apply_brake
     new_actuators.speed = self.apply_speed
-    if self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and self.frame % 2 == 0 and (self.frame // 2) % 5 != 3:
-            regen_paddle_value = 2 if press_regen_paddle else 0
-            can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN, regen_paddle_value))
 
     self.frame += 1
     return new_actuators, can_sends
