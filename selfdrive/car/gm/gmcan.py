@@ -177,9 +177,9 @@ def create_lka_icon_command(bus, active, critical, steer):
     dat = b"\x00\x00\x00"
   return make_can_msg(0x104c006c, dat, bus)
 
-def create_regen_paddle_command(packer, bus):
+def create_regen_paddle_command(packer, bus, regen_paddle_value):
    values = {
-     "RegenPaddle": 2,  # Always send 2 when pressing the paddle
+     "RegenPaddle": regen_paddle_value,
      "Byte1": 0,
      "Byte2": 0,
      "Byte3": 0,
