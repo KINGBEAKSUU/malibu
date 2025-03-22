@@ -48,7 +48,7 @@ class CarControllerParams:
       self.INACTIVE_REGEN = 5650
       # Camera ACC vehicles have no regen while enabled.
       # Camera transitions to MAX_ACC_REGEN from ZERO_GAS and uses friction brakes instantly
-      self.max_regen_acceleration = 0.
+      self.max_regen_acceleration = -1.5
 
     elif CP.carFingerprint in SDGM_CAR:
       self.MAX_GAS = 7496
