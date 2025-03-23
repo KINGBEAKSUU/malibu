@@ -87,6 +87,10 @@ class CarController(CarControllerBase):
     # Send CAN commands.
     can_sends = []
 
+    # Send regen paddle command at 40Hz if active
+    if self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and press_regen_paddle and self.frame % 2 == 0 and (self.frame // 2) % 5 != 3:
+      can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN))
+
     # Steering (Active: 50Hz, inactive: 10Hz)
     steer_step = self.params.STEER_STEP if CC.latActive else self.params.INACTIVE_STEER_STEP
 
@@ -210,10 +214,6 @@ class CarController(CarControllerBase):
       else:
         # to keep accel steady for logs when not sending gas
         accel += self.accel_g
-
-      # Send regen paddle command at 40Hz if active
-      if self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and press_regen_paddle and self.frame % 2 == 0 and (self.frame // 2) % 5 != 3:
-        can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN))
 
       # Radar needs to know current speed and yaw rate (50hz),
       # and that ADAS is alive (10hz)
