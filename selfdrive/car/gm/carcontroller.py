@@ -82,6 +82,7 @@ class CarController(CarControllerBase):
     if hud_v_cruise > 70:
       hud_v_cruise = 0
     press_regen_paddle = accel < -0.30
+    
 
     # Send CAN commands.
     can_sends = []
@@ -100,11 +101,6 @@ class CarController(CarControllerBase):
 
     self.lka_steering_cmd_counter += 1 if CS.loopback_lka_steering_cmd_updated else 0
 
-    # Send regen paddle command at 40Hz if active
-    if self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and self.frame % 2 == 0 and (self.frame // 2) % 5 != 3:
-      regen_paddle_value = 2 if press_regen_paddle else 0
-      can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN, regen_paddle_value))
-      
     # Avoid GM EPS faults when transmitting messages too close together: skip this transmit if we
     # received the ASCMLKASteeringCmd loopback confirmation too recently
     last_lka_steer_msg_ms = (now_nanos - CS.loopback_lka_steering_cmd_ts_nanos) * 1e-6
@@ -214,6 +210,10 @@ class CarController(CarControllerBase):
       else:
         # to keep accel steady for logs when not sending gas
         accel += self.accel_g
+
+      # Send regen paddle command at 40Hz if active
+      if self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and press_regen_paddle and self.frame % 2 == 0 and (self.frame // 2) % 5 != 3:
+        can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN))
 
       # Radar needs to know current speed and yaw rate (50hz),
       # and that ADAS is alive (10hz)
