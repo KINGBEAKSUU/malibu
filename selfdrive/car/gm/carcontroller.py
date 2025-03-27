@@ -82,14 +82,23 @@ class CarController(CarControllerBase):
     if hud_v_cruise > 70:
       hud_v_cruise = 0
     press_regen_paddle = accel < -0.30
-    
 
     # Send CAN commands.
     can_sends = []
 
-    # Send regen paddle command at 40Hz if active
-    if self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and press_regen_paddle and self.frame % 2 == 0 and (self.frame // 2) % 5 != 3:
-      can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN))
+    # Send regen paddle command at 40Hz
+    if (
+      self.CP.carFingerprint in CC_REGEN_PADDLE_CAR
+      and CC.longActive
+      and actuators.accel < -0.3
+      and self.frame % 2 == 0
+      and (self.frame // 2) % 5 != 3
+    ):
+      regen_paddle_value = 2
+    else:
+      regen_paddle_value = 0
+
+    can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN, regen_paddle_value))
 
     # Steering (Active: 50Hz, inactive: 10Hz)
     steer_step = self.params.STEER_STEP if CC.latActive else self.params.INACTIVE_STEER_STEP
