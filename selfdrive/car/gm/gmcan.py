@@ -189,6 +189,19 @@ def create_regen_paddle_command(packer, bus, regen_paddle_value):
    }
    return packer.make_can_msg("EBCMRegenPaddle", bus, values)
 
+def create_prndl2_command(packer, bus):
+    values = {
+      "Byte0": 0x0C,
+      "Byte1": 0x0C,
+      "Byte2": 0x00,
+      "PRNDL2": 0x07,
+      "Byte4": 0x00,
+      "ManualMode": 1,
+      "TransmissionState": 1,
+      "Byte7": 0x00
+    }
+    return packer.make_can_msg("ECMPRDNL2", bus, values)
+
 def create_gm_cc_spam_command(packer, controller, CS, actuators):
   if controller.params_.get_bool("IsMetric"):
     _CV = CV.MS_TO_KPH

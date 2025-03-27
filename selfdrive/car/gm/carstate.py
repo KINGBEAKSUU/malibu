@@ -232,7 +232,7 @@ class CarState(CarStateBase):
       ]
     else:
       messages += [
-        ("ECMPRDNL2", 10),
+        ("ECMPRDNL2", 40),
         ("AcceleratorPedal2", 33),
         ("ECMEngineStatus", 100),
         ("BCMTurnSignals", 1),
