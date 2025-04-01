@@ -270,34 +270,39 @@ static bool gm_tx_hook(const CANPacket_t *to_send) {
     }
   }
 
-  // REGEN PADDLE: safety check
-  /*
-  if (addr == 0xBD) {
-    int regen_paddle = (GET_BYTE(to_send, 0) >> 4) & 0xF;
-
-    // Allow only valid values (0 = off, 2 = pressed)
-    bool valid_regen_value = (regen_paddle == 0 || regen_paddle == 2);
-
-    if (!valid_regen_value) {
-      tx = false;
-    }
-  }
-
   // REGEN PADDLE, PRNDL: safety check
   if (addr == 0x1F5) {
     int prndl_value = GET_BYTE(to_send, 3) & 0xF;
     int manual_mode = GET_BYTE(to_send, 5) & 0xF;
  
-    if (prndl_value != 7 || manual_mode != 2) {
+    // Only allow PRNDL2 spoofing while controls are allowed.
+    // Accept value 7 during regen, otherwise value 6 as default.
+    bool valid_regen_prndl = (prndl_value == 5 || prndl_value == 6 || prndl_value == 7);
+    bool valid_manual_mode = (manual_mode == 0 || manual_mode == 1 || manual_mode == 2);
+ 
+    if (!controls_allowed || !valid_regen_prndl || !valid_manual_mode) {
       tx = false;
     }
   }
-  */
+  // REGEN PADDLE: only allow when controls are allowed
+  if (addr == 0xBD) {
+    if (!controls_allowed) {
+      tx = false;
+    }
+  }
   return tx;
 }
 
 static int gm_fwd_hook(int bus_num, int addr) {
   int bus_fwd = -1;
+
+  // Block the car's original PRNDL2 message when OpenPilot is engaged
+  if (addr == 0x1F5 && controls_allowed) {
+    return -1;
+  }
+  if (addr == 0xBD && controls_allowed) {
+    return -1;
+  }
 
   if ((gm_hw == GM_CAM) || (gm_hw == GM_SDGM)) {
     if (bus_num == 0) {

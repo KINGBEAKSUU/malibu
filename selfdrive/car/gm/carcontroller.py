@@ -57,18 +57,29 @@ class CarController(CarControllerBase):
     self.pitch = FirstOrderFilter(0., 0.09 * 4, DT_CTRL * 4)  # runs at 25 Hz
     self.accel_g = 0.0
 
-  @staticmethod
-  def calc_pedal_command(accel: float, long_active: bool, car_velocity) -> Tuple[float, bool]:
-    if not long_active: return 0., False
-    press_regen_paddle = False
+  def calc_pedal_command(self, accel: float, long_active: bool, car_velocity) -> Tuple[float, bool]:
+    if not long_active:
+      return 0., False
 
-    if accel < -0.30:
-      press_regen_paddle = True
-      pedal_gas = 0
+    press_regen_paddle = accel < -0.5
+
+    # Updated regen gain ratios from bin-averaged 60–0 deceleration sweep
+    speed_mph = [1.25, 3.75, 6.25, 8.75, 11.25, 13.75, 16.25, 18.75, 21.25, 23.75,
+                 26.25, 28.75, 31.25, 33.75, 36.25, 38.75, 41.25, 43.75, 46.25, 48.75,
+                 51.25, 53.75, 56.25, 58.75]
+    regen_gain_ratio = [0.904, 0.893, 0.940, 0.966, 1.002, 1.057, 1.108, 1.129, 1.166, 1.190,
+                        1.194, 1.199, 1.215, 1.230, 1.277, 1.318, 1.325, 1.335, 1.344, 1.348,
+                        1.348, 1.343, 1.341, 1.347]
+
+    mph = car_velocity * 2.23694  # convert m/s to mph
+    gain = interp(mph, speed_mph, regen_gain_ratio)
+
+    if accel < -0.5:
+      pedal_gas = 0.0
     else:
-      # pedaloffset = 0.24
       pedaloffset = interp(car_velocity, [0., 3, 6, 30], [0.10, 0.175, 0.240, 0.240])
-      pedal_gas = clip((pedaloffset + accel * 0.6), 0.0, 1.0)
+      scaled_accel = accel * gain
+      pedal_gas = clip(pedaloffset + scaled_accel * 0.6, 0.0, 1.0)
 
     return pedal_gas, press_regen_paddle
 
@@ -85,19 +96,34 @@ class CarController(CarControllerBase):
     # Send CAN commands.
     can_sends = []
 
-    # Send regen paddle command at 40Hz
-    if self.frame % 2 == 0 and (self.frame // 2) % 5 != 3:
-      if (
-        self.CP.carFingerprint in CC_REGEN_PADDLE_CAR
-        and CC.longActive
-        and actuators.accel < -0.3
-      ):
-        regen_paddle_value = 2
-        can_sends.append(gmcan.create_prndl2_command(self.packer_pt, CanBus.POWERTRAIN))
-      else:
-        regen_paddle_value = 0
+    # Send regen paddle and PRNDL2 commands at 40Hz using alternating 2/3 frame interval
+    frames_since_last = self.frame - getattr(self, "last_trigger_frame_40hz", -3)
+    target_wait = 3 if getattr(self, "wait_long_40hz", False) else 2
 
+    if frames_since_last >= target_wait:
+      self.last_trigger_frame_40hz = self.frame
+      self.wait_long_40hz = not getattr(self, "wait_long_40hz", False)
+
+      regen_active = (
+        self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and
+        CC.longActive and
+        actuators.accel < -0.5
+      )
+
+      # Always send PRNDL2 command when OpenPilot is in control
+      if regen_active:
+        prndl2_value = 7
+      else:
+        prndl2_value = 6
+ 
+      regen_paddle_value = 2 if regen_active else 0
+      manual_mode = 1 if prndl2_value == 7 else 0
+ 
+      can_sends.append(gmcan.create_prndl2_command(
+        self.packer_pt, CanBus.POWERTRAIN, prndl2_value, manual_mode
+      ))
       can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN, regen_paddle_value))
+
 
     # Steering (Active: 50Hz, inactive: 10Hz)
     steer_step = self.params.STEER_STEP if CC.latActive else self.params.INACTIVE_STEER_STEP
@@ -213,7 +239,7 @@ class CarController(CarControllerBase):
           # GasRegenCmdActive needs to be 1 to avoid cruise faults. It describes the ACC state, not actuation
           can_sends.append(gmcan.create_gas_regen_command(self.packer_pt, CanBus.POWERTRAIN, self.apply_gas, idx, acc_engaged, at_full_stop))
           can_sends.append(gmcan.create_friction_brake_command(self.packer_ch, friction_brake_bus, self.apply_brake,
-                                                             idx, CC.enabled, near_stop, at_full_stop, self.CP))
+                                                               idx, CC.enabled, near_stop, at_full_stop, self.CP))
 
           # Send dashboard UI commands (ACC status)
           send_fcw = hud_alert == VisualAlert.fcw
