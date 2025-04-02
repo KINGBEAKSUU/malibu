@@ -74,12 +74,12 @@ class CarController(CarControllerBase):
     mph = car_velocity * 2.23694  # convert m/s to mph
     gain = interp(mph, speed_mph, regen_gain_ratio)
 
-    if accel < -0.5:
-      pedal_gas = 0.0
-    else:
-      pedaloffset = interp(car_velocity, [0., 3, 6, 30], [0.10, 0.175, 0.240, 0.240])
+    pedaloffset = interp(car_velocity, [0., 3, 6, 30], [0.10, 0.175, 0.240, 0.240])
+    if press_regen_paddle:
       scaled_accel = accel * gain
-      pedal_gas = clip(pedaloffset + scaled_accel * 0.6, 0.0, 1.0)
+    else:
+      scaled_accel = accel
+    pedal_gas = clip(pedaloffset + scaled_accel * 0.6, 0.0, 1.0)
 
     return pedal_gas, press_regen_paddle
 
