@@ -65,9 +65,9 @@ class CarController(CarControllerBase):
     if not hasattr(self, "prev_press_regen_paddle"):
       self.prev_press_regen_paddle = False
     
-    if actuators.accel < -0.06:
+    if accel < -0.06:
       press_regen_paddle = True
-    elif actuators.accel > 0.03:
+    elif accel > 0.03:
       press_regen_paddle = False
     else:
       press_regen_paddle = self.prev_press_regen_paddle
