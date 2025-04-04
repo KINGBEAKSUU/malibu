@@ -66,9 +66,9 @@ class CarController(CarControllerBase):
       self.prev_press_regen_paddle = False
     
     press_regen_paddle = self.prev_press_regen_paddle
-    if accel < -0.06:
+    if accel < -0.3:
       press_regen_paddle = True
-    elif accel > 0.03:
+    elif accel > 0.05:
       press_regen_paddle = False
 
     # Updated regen gain ratios from bin-averaged 60–0 deceleration sweep
