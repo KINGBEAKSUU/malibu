@@ -70,8 +70,6 @@ class CarController(CarControllerBase):
       press_regen_paddle = True
     elif accel > 0.03:
       press_regen_paddle = False
-    
-    self.prev_press_regen_paddle = press_regen_paddle
 
     # Updated regen gain ratios from bin-averaged 60–0 deceleration sweep
     speed_mps = [0.559, 1.678, 2.797, 3.916, 5.035, 6.154, 7.273, 8.392, 9.511, 10.63,
@@ -96,6 +94,7 @@ class CarController(CarControllerBase):
 
   def update(self, CC, CS, now_nanos, frogpilot_toggles):
     actuators = CC.actuators
+    press_regen_paddle = False
     accel = brake_accel = actuators.accel
     hud_control = CC.hudControl
     hud_alert = hud_control.visualAlert
