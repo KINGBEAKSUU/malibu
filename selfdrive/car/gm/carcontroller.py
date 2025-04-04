@@ -61,7 +61,18 @@ class CarController(CarControllerBase):
     if not long_active:
       return 0., False
 
-    press_regen_paddle = accel < -0.5
+    # Regen paddle logic with hysteresis to avoid spamming
+    if not hasattr(self, "prev_press_regen_paddle"):
+      self.prev_press_regen_paddle = False
+    
+    if actuators.accel < -0.06:
+      press_regen_paddle = True
+    elif actuators.accel > 0.03:
+      press_regen_paddle = False
+    else:
+      press_regen_paddle = self.prev_press_regen_paddle
+    
+    self.prev_press_regen_paddle = press_regen_paddle
 
     # Updated regen gain ratios from bin-averaged 60–0 deceleration sweep
     speed_mps = [0.559, 1.678, 2.797, 3.916, 5.035, 6.154, 7.273, 8.392, 9.511, 10.63,
@@ -108,7 +119,7 @@ class CarController(CarControllerBase):
         self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and
         self.CP.openpilotLongitudinalControl and
         CC.longActive and
-        actuators.accel < -0.5
+        press_regen_paddle
       )
 
       # Always send PRNDL2 command when OpenPilot is in control
@@ -204,6 +215,9 @@ class CarController(CarControllerBase):
           if self.CP.carFingerprint in CC_ONLY_CAR:
             # gas interceptor only used for full long control on cars without ACC
             interceptor_gas_cmd, press_regen_paddle = self.calc_pedal_command(actuators.accel, CC.longActive, CS.out.vEgo)
+          elif self.CP.carFingerprint in CC_REGEN_PADDLE_CAR:
+            #  ACC cars need to calculate press_regen_paddle for spoofing
+            _, press_regen_paddle = self.calc_pedal_command(actuators.accel, CC.longActive, CS.out.vEgo)
 
         if self.CP.enableGasInterceptor and self.apply_gas > self.params.INACTIVE_REGEN and CS.out.cruiseState.standstill:
           # "Tap" the accelerator pedal to re-engage ACC
