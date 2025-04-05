@@ -61,7 +61,7 @@ class CarController(CarControllerBase):
     if not long_active:
       return 0., False
 
-    press_regen_paddle = accel < -0.5
+    press_regen_paddle = accel < -0.2
 
     # Updated regen gain ratios from bin-averaged 60–0 deceleration sweep
     speed_mps = [0.559, 1.678, 2.797, 3.916, 5.035, 6.154, 7.273, 8.392, 9.511, 10.63,
@@ -108,7 +108,7 @@ class CarController(CarControllerBase):
         self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and
         self.CP.openpilotLongitudinalControl and
         CC.longActive and
-        actuators.accel < -0.5
+        actuators.accel < -0.2
       )
 
       # Always send PRNDL2 command when OpenPilot is in control
