@@ -56,21 +56,12 @@ class CarController(CarControllerBase):
     # FrogPilot variables
     self.pitch = FirstOrderFilter(0., 0.09 * 4, DT_CTRL * 4)  # runs at 25 Hz
     self.accel_g = 0.0
-    self.accel_filter = FirstOrderFilter(0.0, 0.2, DT_CTRL)  # For smoothing aEgo (used for regen paddle logic)
 
-  def calc_pedal_command(self, raw_accel: float, accel: float, long_active: bool, car_velocity) -> Tuple[float, bool]:
+  def calc_pedal_command(self, accel: float, long_active: bool, car_velocity) -> Tuple[float, bool]:
     if not long_active:
       return 0., False
 
-    # Regen paddle logic with hysteresis to avoid spamming
-    if not hasattr(self, "prev_press_regen_paddle"):
-      self.prev_press_regen_paddle = False
-
-    press_regen_paddle = self.prev_press_regen_paddle
-    if raw_accel < -0.3:
-      press_regen_paddle = True
-    elif raw_accel > -0.1:
-      press_regen_paddle = False
+    press_regen_paddle = accel < -0.5
 
     # Updated regen gain ratios from bin-averaged 60–0 deceleration sweep
     speed_mps = [0.559, 1.678, 2.797, 3.916, 5.035, 6.154, 7.273, 8.392, 9.511, 10.63,
@@ -95,8 +86,6 @@ class CarController(CarControllerBase):
 
   def update(self, CC, CS, now_nanos, frogpilot_toggles):
     actuators = CC.actuators
-    filtered_aego = self.accel_filter.update(CS.out.aEgo)
-    press_regen_paddle = False
     accel = brake_accel = actuators.accel
     hud_control = CC.hudControl
     hud_alert = hud_control.visualAlert
@@ -119,7 +108,7 @@ class CarController(CarControllerBase):
         self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and
         self.CP.openpilotLongitudinalControl and
         CC.longActive and
-        press_regen_paddle
+        actuators.accel < -0.5
       )
 
       # Always send PRNDL2 command when OpenPilot is in control
@@ -127,10 +116,10 @@ class CarController(CarControllerBase):
         prndl2_value = 7
       else:
         prndl2_value = 6
-
+ 
       regen_paddle_value = 2 if regen_active else 0
       manual_mode = 1 if prndl2_value == 7 else 0
-
+ 
       can_sends.append(gmcan.create_prndl2_command(
         self.packer_pt, CanBus.POWERTRAIN, prndl2_value, manual_mode
       ))
@@ -214,10 +203,7 @@ class CarController(CarControllerBase):
             self.apply_gas = self.params.INACTIVE_REGEN
           if self.CP.carFingerprint in CC_ONLY_CAR:
             # gas interceptor only used for full long control on cars without ACC
-            interceptor_gas_cmd, press_regen_paddle = self.calc_pedal_command(filtered_aego, actuators.accel, CC.longActive, CS.out.vEgo)
-          elif self.CP.carFingerprint in CC_REGEN_PADDLE_CAR:
-            #  ACC cars need to calculate press_regen_paddle for spoofing
-            _, press_regen_paddle = self.calc_pedal_command(filtered_aego, actuators.accel, CC.longActive, CS.out.vEgo)
+            interceptor_gas_cmd, press_regen_paddle = self.calc_pedal_command(actuators.accel, CC.longActive, CS.out.vEgo)
 
         if self.CP.enableGasInterceptor and self.apply_gas > self.params.INACTIVE_REGEN and CS.out.cruiseState.standstill:
           # "Tap" the accelerator pedal to re-engage ACC
