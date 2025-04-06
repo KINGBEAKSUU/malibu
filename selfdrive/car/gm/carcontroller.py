@@ -56,7 +56,7 @@ class CarController(CarControllerBase):
     # FrogPilot variables
     self.pitch = FirstOrderFilter(0., 0.09 * 4, DT_CTRL * 4)  # runs at 25 Hz
     self.accel_g = 0.0
-    self.aego_filtered = FirstOrderFilter(0.0, 0.2, DT_CTRL)
+    self.aego_filtered = FirstOrderFilter(0.0, 0.15, DT_CTRL)
     self.regen_paddle_pressed = False
 
   def calc_pedal_command(self, accel: float, long_active: bool, car_velocity) -> Tuple[float, bool]:
