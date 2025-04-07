@@ -87,7 +87,8 @@ class CarController(CarControllerBase):
       scaled_accel = accel
     pedal_gas = clip(pedaloffset + scaled_accel * 0.6, 0.0, 1.0)
 
-    if accel < -1.0:
+    accel_cutoff = -0.5 * gain
+    if accel < accel_cutoff:
       pedal_gas = 0.0
     return pedal_gas, press_regen_paddle
 
