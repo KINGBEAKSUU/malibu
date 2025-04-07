@@ -63,10 +63,10 @@ class CarController(CarControllerBase):
     if not long_active:
       return 0., False
 
-    if not self.regen_paddle_pressed:
-      self.regen_paddle_pressed = self.aego_filtered.x < -1.0
+    if self.aego_filtered.x < -0.3:
+      self.regen_paddle_pressed = True
     else:
-      self.regen_paddle_pressed = self.aego_filtered.x < 0.1
+      self.regen_paddle_pressed = False
     press_regen_paddle = self.regen_paddle_pressed
 
     # Updated regen gain ratios from bin-averaged 60–0 deceleration sweep
@@ -81,7 +81,10 @@ class CarController(CarControllerBase):
     gain = interp(car_velocity, speed_mps, regen_gain_ratio)
 
     pedaloffset = interp(car_velocity, [0., 3, 6, 30], [0.10, 0.175, 0.240, 0.240])
-    scaled_accel = accel
+    if press_regen_paddle:
+      scaled_accel = accel * gain
+    else:
+      scaled_accel = accel
     pedal_gas = clip(pedaloffset + scaled_accel * 0.6, 0.0, 1.0)
 
     return pedal_gas, press_regen_paddle
@@ -89,7 +92,7 @@ class CarController(CarControllerBase):
 
   def update(self, CC, CS, now_nanos, frogpilot_toggles):
     actuators = CC.actuators
-    self.aego_filtered.x = CS.out.aEgo
+    self.aego_filtered.update(CS.out.aEgo)
     accel = brake_accel = actuators.accel
     hud_control = CC.hudControl
     hud_alert = hud_control.visualAlert
@@ -119,10 +122,10 @@ class CarController(CarControllerBase):
       if regen_active:
         prndl2_value = 7
       else:
-        prndl2_value = 6
+        prndl2_value = 7
  
-      regen_paddle_value = 2 if regen_active else 0
-      manual_mode = 1 if prndl2_value == 7 else 0
+      regen_paddle_value = 2 if regen_active else 2
+      manual_mode = 1 if prndl2_value == 7 else 1
  
       can_sends.append(gmcan.create_prndl2_command(
         self.packer_pt, CanBus.POWERTRAIN, prndl2_value, manual_mode
