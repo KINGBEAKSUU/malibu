@@ -58,16 +58,22 @@ class CarController(CarControllerBase):
     self.accel_g = 0.0
     self.aego_filtered = FirstOrderFilter(0.0, 0.2, DT_CTRL)
     self.regen_paddle_pressed = False
+    self.regen_paddle_filter = FirstOrderFilter(0.0, 0.2, DT_CTRL)
+    self.regen_paddle_hysteresis = False
 
   def calc_pedal_command(self, accel: float, long_active: bool, car_velocity) -> Tuple[float, bool]:
     if not long_active:
       return 0., False
 
     if self.CP is not None and hasattr(self, 'CS'):
-      if self.CS.out.aEgo < -0.6:
-        self.regen_paddle_pressed = True
-      else:
-        self.regen_paddle_pressed = False
+      self.regen_paddle_filter.update(self.CS.out.aEgo)
+      filtered_aEgo = self.regen_paddle_filter.x
+      if not self.regen_paddle_hysteresis and filtered_aEgo < -0.6:
+        self.regen_paddle_hysteresis = True
+      elif self.regen_paddle_hysteresis and filtered_aEgo > 0.1:
+        self.regen_paddle_hysteresis = False
+
+      self.regen_paddle_pressed = self.regen_paddle_hysteresis
 
     press_regen_paddle = self.regen_paddle_pressed
 
