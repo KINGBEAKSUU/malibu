@@ -63,10 +63,12 @@ class CarController(CarControllerBase):
     if not long_active:
       return 0., False
 
-    if CS.out.aEgo < -0.6:
-      self.regen_paddle_pressed = True
-    else:
-      self.regen_paddle_pressed = False
+    if self.CP is not None and hasattr(self, 'CS'):
+      if self.CS.out.aEgo < -0.6:
+        self.regen_paddle_pressed = True
+      else:
+        self.regen_paddle_pressed = False
+
     press_regen_paddle = self.regen_paddle_pressed
 
     # Updated regen gain ratios from bin-averaged 60–0 deceleration sweep
