@@ -37,6 +37,7 @@ class FrogPilotPlanner:
     self.model_length = 0
     self.road_curvature = 1
     self.v_cruise = 0
+    self.frogtfollow = 0.0
 
   def update(self, carControl, carState, controlsState, frogpilotCarControl, frogpilotCarState, frogpilotNavigation, modelData, radarless_model, radarState, frogpilot_toggles):
     if radarless_model:
@@ -108,7 +109,7 @@ class FrogPilotPlanner:
     frogpilotPlan.speedJerk = float(J_EGO_COST * self.frogpilot_following.speed_jerk)
     frogpilotPlan.speedJerkStock = float(J_EGO_COST * self.frogpilot_following.base_speed_jerk)
     frogpilotPlan.tFollow = float(self.frogpilot_following.t_follow)
-
+    self.frogtfollow = frogpilotPlan.tFollow
     frogpilotPlan.mtscSpeed = float(self.frogpilot_vcruise.mtsc_target)
     frogpilotPlan.vtscControllingCurve = bool(self.frogpilot_vcruise.mtsc_target > self.frogpilot_vcruise.vtsc_target)
     frogpilotPlan.vtscSpeed = float(self.frogpilot_vcruise.vtsc_target)
