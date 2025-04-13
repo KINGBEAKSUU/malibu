@@ -56,18 +56,16 @@ class CarController(CarControllerBase):
     # FrogPilot variables
     self.pitch = FirstOrderFilter(0., 0.09 * 4, DT_CTRL * 4)  # runs at 25 Hz
     self.accel_g = 0.0
-    self.aego_filtered = FirstOrderFilter(0.0, 0.2, DT_CTRL)
     self.regen_paddle_pressed = False
+    self.aego = 0.0
 
   def calc_pedal_command(self, accel: float, long_active: bool, car_velocity) -> Tuple[float, bool]:
     if not long_active:
       return 0., False
 
-    if self.CP is not None and hasattr(self, 'CS'):
-      aego = self.CS.out.aEgo
-      if aego < -0.1:
-        self.regen_paddle_pressed = True
-      elif aego > 0.5:
+    if self.aego < -0.5:
+      self.regen_paddle_pressed = True
+    elif self.aego > 0.1:
         self.regen_paddle_pressed = False
 
     press_regen_paddle = self.regen_paddle_pressed
@@ -100,8 +98,8 @@ class CarController(CarControllerBase):
 
   def update(self, CC, CS, now_nanos, frogpilot_toggles):
     self.CS = CS
+    self.aego = CS.out.aEgo
     actuators = CC.actuators
-    # self.aego_filtered.update(CS.out.aEgo)
     accel = brake_accel = actuators.accel
     hud_control = CC.hudControl
     hud_alert = hud_control.visualAlert
