@@ -85,7 +85,7 @@ class CarController(CarControllerBase):
     accel_cutoff = -0.5 * gain
     
     if press_regen_paddle:
-      scaled_accel = accel * gain
+      scaled_accel = accel / gain
     else:
       scaled_accel = accel
 
