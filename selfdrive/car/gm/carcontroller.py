@@ -65,9 +65,9 @@ class CarController(CarControllerBase):
 
     if self.CP is not None and hasattr(self, 'CS'):
       aego = self.CS.out.aEgo
-      if aego < -0.5:
+      if aego < -0.1:
         self.regen_paddle_pressed = True
-      elif aego > 0.1:
+      elif aego > 0.5:
         self.regen_paddle_pressed = False
 
     press_regen_paddle = self.regen_paddle_pressed
