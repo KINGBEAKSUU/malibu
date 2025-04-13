@@ -99,6 +99,7 @@ class CarController(CarControllerBase):
 
 
   def update(self, CC, CS, now_nanos, frogpilot_toggles):
+    self.CS = CS
     actuators = CC.actuators
     # self.aego_filtered.update(CS.out.aEgo)
     accel = brake_accel = actuators.accel
