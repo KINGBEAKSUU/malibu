@@ -67,7 +67,7 @@ class CarController(CarControllerBase):
     if not hasattr(self, 'regen_paddle_timer'):
       self.regen_paddle_timer = 0
 
-    if self.aego < -0.5:
+    if self.aego < -0.7:
       self.regen_paddle_timer += 1
     elif self.aego > 0.1:
       self.regen_paddle_timer = 0
@@ -91,7 +91,7 @@ class CarController(CarControllerBase):
     accel_cutoff = -0.5
     
     if press_regen_paddle:
-      scaled_accel = accel * gain
+      scaled_accel = accel / gain
     else:
       scaled_accel = accel
 
