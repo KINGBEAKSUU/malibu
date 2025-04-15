@@ -63,10 +63,16 @@ class CarController(CarControllerBase):
     if not long_active:
       return 0., False
 
+    # Regen paddle hysteresis (200ms = 20 frames)
+    if not hasattr(self, 'regen_paddle_timer'):
+      self.regen_paddle_timer = 0
+
     if self.aego < -0.5:
-      self.regen_paddle_pressed = True
+      self.regen_paddle_timer += 1
     elif self.aego > 0.1:
-        self.regen_paddle_pressed = False
+      self.regen_paddle_timer = 0
+
+    self.regen_paddle_pressed = self.regen_paddle_timer >= 20
 
     press_regen_paddle = self.regen_paddle_pressed
 
