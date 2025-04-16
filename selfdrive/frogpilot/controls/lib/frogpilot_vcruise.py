@@ -10,7 +10,6 @@ from openpilot.selfdrive.controls.lib.drive_helpers import V_CRUISE_UNSET
 from openpilot.selfdrive.frogpilot.controls.lib.map_turn_speed_controller import MapTurnSpeedController
 from openpilot.selfdrive.frogpilot.controls.lib.speed_limit_controller import SpeedLimitController
 from openpilot.selfdrive.frogpilot.frogpilot_variables import CRUISING_SPEED, PLANNER_TIME, params_memory
-from collections import deque
 
 TARGET_LAT_A = 2.0
 
@@ -34,10 +33,6 @@ class FrogPilotVCruise:
     self.speed_limit_timer = 0
     self.tracked_model_length = 0
     self.vtsc_target = 0
-    self.dRelk = 0
-    self.vRelk = 0
-    self.dRelk_hist = deque(maxlen=10)
-    self.drelk_stable = False
 
   def update(self, carControl, carState, controlsState, frogpilotCarControl, frogpilotCarState, frogpilotNavigation, v_cruise, v_ego, frogpilot_toggles):
     force_stop = frogpilot_toggles.force_stops and self.frogpilot_planner.cem.stop_light_detected and controlsState.enabled
@@ -63,7 +58,6 @@ class FrogPilotVCruise:
 
     v_ego_cluster = max(carState.vEgoCluster, v_ego)
     v_ego_diff = v_ego_cluster - v_ego
-    lead = self.frogpilot_planner.lead_one
 
     # Pfeiferj's Map Turn Speed Controller
     if frogpilot_toggles.map_turn_speed_controller and v_ego > CRUISING_SPEED and carControl.longActive:
@@ -77,44 +71,6 @@ class FrogPilotVCruise:
         self.mtsc_target = v_cruise
     else:
       self.mtsc_target = v_cruise if v_cruise != V_CRUISE_UNSET else 0
-
-    # Extended lead linear braking (Thanks, Mike)
-    if lead is not None:
-      d_rel = lead.dRel
-      v_lead = lead.vLead
-      v_rel = v_ego - v_lead
-
-      if (v_lead + 2) < v_ego > CRUISING_SPEED and self.frogpilot_planner.tracking_lead:
-        decelRate = (v_rel ** 2) / (2 * max(d_rel, 1e-6)) * 4
-        self.lead_target = v_ego - decelRate
-
-      if self.frogpilot_planner.tracking_lead:
-        self.dRelk = 0.8 * float(lead.dRel) + 0.2 * self.dRelk
-        self.vRelk = 0.8 * float(v_rel) + 0.2 * self.vRelk
-        self.dRelk_hist.append(self.dRelk)
-        if len(self.dRelk_hist) >= 5:
-          y = np.array(self.dRelk_hist)
-          x = np.arange(len(y))
-          drel_slope = np.polyfit(x, y, 1)[0]
-          self.drelk_stable = drel_slope > -0.1
-      else:
-        self.drelk_stable = False
-        self.dRelk_hist.clear()
-
-      expected_dist = (self.frogpilot_planner.frogtfollow - 0.25) * v_ego
-      distance_error = expected_dist - self.dRelk
-
-      if self.dRelk < expected_dist and v_ego > 2.0 and self.frogpilot_planner.tracking_lead and not self.drelk_stable:
-        k_p = 0.1
-        k_v = 0.5
-        max_trim = 3.0
-        trim = k_p * distance_error + k_v * max(0, self.vRelk)
-        trim = min(trim, max_trim)
-        trimmed_vego = v_ego - max(0.0, trim)
-        if self.lead_target > trimmed_vego:
-          self.lead_target = trimmed_vego
-      else:
-        self.lead_target = v_cruise if v_cruise != V_CRUISE_UNSET else 0
 
     # Pfeiferj's Speed Limit Controller
     if frogpilot_toggles.show_speed_limits or frogpilot_toggles.speed_limit_controller:
