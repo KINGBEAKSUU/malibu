@@ -116,8 +116,8 @@ class CarController(CarControllerBase):
     # Send CAN commands.
     can_sends = []
 
-    # Send PRNDL2 and Regen Paddle commands on alternating frames with steering at 50Hz
-    if self.frame % 2 == 1:
+    # Send commands at 40hz
+    if self.frame % 2 == 0 and (self.frame // 2) % 5 != 3:
 
       regen_active = (
         self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and
