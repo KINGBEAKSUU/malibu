@@ -67,7 +67,7 @@ class CarController(CarControllerBase):
     if not hasattr(self, 'regen_paddle_timer'):
       self.regen_paddle_timer = 0
 
-    if self.aego < -0.7:
+    if self.aego < -0.7 and accel <= 0.0:
       self.regen_paddle_timer += 1
     else:
       self.regen_paddle_timer = max(self.regen_paddle_timer - 1, 0)
@@ -88,7 +88,7 @@ class CarController(CarControllerBase):
     gain = interp(car_velocity, speed_mps, regen_gain_ratio)
 
     pedaloffset = interp(car_velocity, [0., 3, 6, 30], [0.10, 0.175, 0.240, 0.240])
-    accel_cutoff = -0.5
+    accel_cutoff = -0.5 * gain
     
     if press_regen_paddle:
       scaled_accel = accel / gain
@@ -116,28 +116,32 @@ class CarController(CarControllerBase):
     # Send CAN commands.
     can_sends = []
 
-    # Send commands at 40hz
-    if self.frame % 2 == 0 and (self.frame // 2) % 5 != 3:
-
+    # Cleanly offset PRNDL2 and Regen Paddle messages from steer messages (0x180 sent every 3 frames)
+    if self.frame % 3 == 1:
       regen_active = (
         self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and
         self.CP.openpilotLongitudinalControl and
         CC.longActive and
         self.regen_paddle_pressed
       )
-
-      # Always send PRNDL2 command when OpenPilot is in control
-      if regen_active:
-        prndl2_value = 7
-      else:
-        prndl2_value = 6
  
-      regen_paddle_value = 2 if regen_active else 0
+      prndl2_value = 7 if regen_active else 6
       manual_mode = 1 if prndl2_value == 7 else 0
  
       can_sends.append(gmcan.create_prndl2_command(
         self.packer_pt, CanBus.POWERTRAIN, prndl2_value, manual_mode
       ))
+ 
+    elif self.frame % 3 == 2:
+      regen_active = (
+        self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and
+        self.CP.openpilotLongitudinalControl and
+        CC.longActive and
+        self.regen_paddle_pressed
+      )
+ 
+      regen_paddle_value = 2 if regen_active else 0
+ 
       can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN, regen_paddle_value))
 
 
