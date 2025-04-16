@@ -296,6 +296,15 @@ static bool gm_tx_hook(const CANPacket_t *to_send) {
 static int gm_fwd_hook(int bus_num, int addr) {
   int bus_fwd = -1;
 
+  // Block the car's original PRNDL2 message when OpenPilot is engaged
+  if (addr == 0x1F5 && controls_allowed) {
+    return -1;
+  }
+  if (addr == 0xBD && controls_allowed) {
+    return -1;
+  }
+
+
   if ((gm_hw == GM_CAM) || (gm_hw == GM_SDGM)) {
     if (bus_num == 0) {
       // block PSCMStatus; forwarded through openpilot to hide an alert from the camera
