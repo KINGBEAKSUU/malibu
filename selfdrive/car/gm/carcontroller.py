@@ -69,8 +69,8 @@ class CarController(CarControllerBase):
 
     if self.aego < -0.7:
       self.regen_paddle_timer += 1
-    elif self.aego > 0.1:
-      self.regen_paddle_timer = 0
+    else:
+      self.regen_paddle_timer = max(self.regen_paddle_timer - 1, 0)
 
     self.regen_paddle_pressed = self.regen_paddle_timer >= 20
 
