@@ -246,8 +246,8 @@ static bool gm_tx_hook(const CANPacket_t *to_send) {
     int gas_regen = ((GET_BYTE(to_send, 1) & 0x1U) << 13) + ((GET_BYTE(to_send, 2) & 0xFFU) << 5) + ((GET_BYTE(to_send, 3) & 0xF8U) >> 3);
 
     bool violation = false;
-    // Allow apply bit in pre-enabled and overriding states
-    violation |= !controls_allowed && apply;
+    // TEMP DISABLED: allow regen/gas even when controls aren't allowed
+    // violation |= !controls_allowed && apply;
     violation |= longitudinal_gas_checks(gas_regen, *gm_long_limits);
 
     if (violation) {
@@ -280,16 +280,18 @@ static bool gm_tx_hook(const CANPacket_t *to_send) {
     bool valid_regen_prndl = (prndl_value == 5 || prndl_value == 6 || prndl_value == 7);
     bool valid_manual_mode = (manual_mode == 0 || manual_mode == 1 || manual_mode == 2);
  
-    if (!controls_allowed || !valid_regen_prndl || !valid_manual_mode) {
+    // TEMP DISABLED: allow PRNDL spoofing even when controls aren't allowed
+    // if (!controls_allowed || !valid_regen_prndl || !valid_manual_mode) {
+    if (!valid_regen_prndl || !valid_manual_mode) {
       tx = false;
     }
   }
-  // REGEN PADDLE: only allow when controls are allowed
-  if (addr == 0xBD) {
-    if (!controls_allowed) {
-      tx = false;
-    }
-  }
+  // TEMP DISABLED: allow regen paddle spoofing even when controls aren't allowed
+  // if (addr == 0xBD) {
+  //   if (!controls_allowed) {
+  //     tx = false;
+  //   }
+  // }
   return tx;
 }
 
