@@ -125,8 +125,14 @@ class CarController(CarControllerBase):
         self.regen_paddle_pressed
       )
  
-      prndl2_value = 7 if regen_active else 6
+      desired_prndl2 = 7 if regen_active else 6
+      if abs(actuators.steer) > 0 and desired_prndl2 != self.prev_prndl2_value:
+        prndl2_value = self.prev_prndl2_value
+      else:
+        prndl2_value = desired_prndl2
+
       manual_mode = 1 if prndl2_value == 7 else 0
+      self.prev_prndl2_value = prndl2_value
  
       can_sends.append(gmcan.create_prndl2_command(
         self.packer_pt, CanBus.POWERTRAIN, prndl2_value, manual_mode
