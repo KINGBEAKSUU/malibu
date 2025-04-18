@@ -95,9 +95,9 @@ class CarController(CarControllerBase):
     else:
       scaled_accel = accel
 
-    pedal_gas = clip(pedaloffset + scaled_accel * 0.6, 0.0, 1.0)
-    if not press_regen_paddle and accel > 0.05:
-      pedal_gas = max(pedal_gas, 0.01)
+    pedal_gas = pedaloffset + scaled_accel * 0.6
+    pedal_gas = max(pedal_gas, 0.01 if press_regen_paddle else 0.0)
+    pedal_gas = min(pedal_gas, 1.0)
 
     return pedal_gas, press_regen_paddle
 
@@ -105,8 +105,6 @@ class CarController(CarControllerBase):
   def update(self, CC, CS, now_nanos, frogpilot_toggles):
     self.CS = CS
     self.aego = CS.out.aEgo
-    if not hasattr(self, "prev_prndl2_value"):
-      self.prev_prndl2_value = 6
     actuators = CC.actuators
     accel = brake_accel = actuators.accel
     hud_control = CC.hudControl
@@ -118,38 +116,33 @@ class CarController(CarControllerBase):
     # Send CAN commands.
     can_sends = []
 
-    # Cleanly offset PRNDL2 and Regen Paddle messages from steer messages (0x180 sent every 3 frames)
-    if self.frame % 3 == 1:
+    # Send regen paddle and PRNDL2 commands at 40Hz using alternating 2/3 frame interval
+    frames_since_last = self.frame - getattr(self, "last_trigger_frame_40hz", -3)
+    target_wait = 3 if getattr(self, "wait_long_40hz", False) else 2
+
+    if frames_since_last >= target_wait:
+      self.last_trigger_frame_40hz = self.frame
+      self.wait_long_40hz = not getattr(self, "wait_long_40hz", False)
+
       regen_active = (
         self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and
         self.CP.openpilotLongitudinalControl and
         CC.longActive and
         self.regen_paddle_pressed
       )
- 
-      desired_prndl2 = 7 if regen_active else 6
-      if abs(actuators.steer) > 0 and desired_prndl2 != self.prev_prndl2_value:
-        prndl2_value = self.prev_prndl2_value
-      else:
-        prndl2_value = desired_prndl2
 
+      # Always send PRNDL2 command when OpenPilot is in control
+      if regen_active:
+        prndl2_value = 7
+      else:
+        prndl2_value = 6
+ 
+      regen_paddle_value = 2 if regen_active else 0
       manual_mode = 1 if prndl2_value == 7 else 0
-      self.prev_prndl2_value = prndl2_value
  
       can_sends.append(gmcan.create_prndl2_command(
         self.packer_pt, CanBus.POWERTRAIN, prndl2_value, manual_mode
       ))
- 
-    elif self.frame % 3 == 2:
-      regen_active = (
-        self.CP.carFingerprint in CC_REGEN_PADDLE_CAR and
-        self.CP.openpilotLongitudinalControl and
-        CC.longActive and
-        self.regen_paddle_pressed
-      )
- 
-      regen_paddle_value = 2 if regen_active else 0
- 
       can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN, regen_paddle_value))
 
 
