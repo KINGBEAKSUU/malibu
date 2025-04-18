@@ -74,18 +74,7 @@ class CarControllerParams:
     self.BRAKE_LOOKUP_BP = [self.ACCEL_MIN, self.max_regen_acceleration]
     self.BRAKE_LOOKUP_V = [self.MAX_BRAKE, 0.]
 
-  # determined by letting Volt regen to a stop in L gear from 89mph,
-  # and by letting off gas and allowing car to creep, for determining
-  # the positive threshold values at very low speed
-  EV_GAS_BRAKE_THRESHOLD_BP = [1.12, 3.35, 5.59, 7.82, 10.06, 12.29, 14.53, 16.76, 19.0, 21.23, 23.47, 25.7, 27.94, 30.18, 32.41, 34.65]
-  EV_GAS_BRAKE_THRESHOLD_V = [-0.49, -0.59, -0.64, -0.66, -0.68, -0.78, -0.93, -1.0, -1.09, -1.1, -1.23, -1.28, -1.35, -1.4, -1.41, -1.46]
 
-  def update_ev_gas_brake_threshold(self, v_ego):
-    gas_brake_threshold = interp(v_ego, self.EV_GAS_BRAKE_THRESHOLD_BP, self.EV_GAS_BRAKE_THRESHOLD_V)
-    self.GAS_LOOKUP_BP_PLUS = [self.max_regen_acceleration, 0., self.ACCEL_MAX_PLUS]
-    self.EV_GAS_LOOKUP_BP = [gas_brake_threshold, max(0., gas_brake_threshold), self.ACCEL_MAX]
-    self.EV_GAS_LOOKUP_BP_PLUS = [gas_brake_threshold, max(0., gas_brake_threshold), self.ACCEL_MAX_PLUS]
-    self.EV_BRAKE_LOOKUP_BP = [self.ACCEL_MIN, gas_brake_threshold]
 
 @dataclass
 class GMCarDocs(CarDocs):
