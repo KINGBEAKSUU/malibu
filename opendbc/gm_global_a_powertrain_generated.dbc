@@ -82,6 +82,12 @@ VAL_TABLE_ HandsOffSWDetectionMode 2 "Failed" 1 "Enabled" 0 "Disabled" ;
 
 BO_ 189 EBCMRegenPaddle: 7 K17_EBCM
  SG_ RegenPaddle : 7|4@0+ (1,0) [0|0] ""  NEO
+ SG_ Byte1 : 8|8@1+ (1,0) [0|255] "" NEO
+ SG_ Byte2 : 16|8@1+ (1,0) [0|255] "" NEO
+ SG_ Byte3 : 24|8@1+ (1,0) [0|255] "" NEO
+ SG_ Byte4 : 32|8@1+ (1,0) [0|255] "" NEO
+ SG_ Byte5 : 40|8@1+ (1,0) [0|255] "" NEO
+ SG_ Byte6 : 48|8@1+ (1,0) [0|255] "" NEO
 
 BO_ 190 ECMAcceleratorPos: 6 K20_ECM
  SG_ BrakePedalPos : 15|8@0+ (1,0) [0|0] "sticky"  NEO
