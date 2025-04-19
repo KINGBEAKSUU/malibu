@@ -388,10 +388,6 @@ struct CarControl {
     speed @6: Float32; # m/s
     accel @4: Float32; # m/s^2
     longControlState @5: LongControlState;
-    customReserved1 @20 :Float32;
-    customReserved2 @21 :Float32;
-    customReserved3 @22 :Float32;
-    customReserved4 @23 :Float32;
 
     enum LongControlState @0xe40f3a917d908282{
       off @0;

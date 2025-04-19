@@ -88,6 +88,7 @@ class CarController(CarControllerBase):
     gain = interp(car_velocity, speed_mps, regen_gain_ratio)
 
     pedaloffset = interp(car_velocity, [0., 3, 6, 30], [0.10, 0.175, 0.240, 0.240])
+    accel_cutoff = -0.5 * gain
     
     if press_regen_paddle:
       pedal_gas = pedaloffset + (accel / gain) * 0.6
@@ -96,7 +97,7 @@ class CarController(CarControllerBase):
       pedal_gas = clip((pedaloffset + accel * 0.6), 0.0, 1.0)
     pedal_gas = min(pedal_gas, 1.0)
 
-    return pedal_gas, pedal_gas, pedaloffset
+    return pedal_gas, press_regen_paddle
 
 
   def update(self, CC, CS, now_nanos, frogpilot_toggles):
@@ -219,12 +220,13 @@ class CarController(CarControllerBase):
             self.apply_gas = self.params.INACTIVE_REGEN
           if self.CP.carFingerprint in CC_ONLY_CAR:
             # gas interceptor only used for full long control on cars without ACC
-            interceptor_gas_cmd, pedal_gas, pedaloffset = self.calc_pedal_command(actuators.accel, CC.longActive, CS.out.vEgo)
+            interceptor_gas_cmd, press_regen_paddle = self.calc_pedal_command(actuators.accel, CC.longActive, CS.out.vEgo)
 
         if self.CP.enableGasInterceptor and self.apply_gas > self.params.INACTIVE_REGEN and CS.out.cruiseState.standstill:
           # "Tap" the accelerator pedal to re-engage ACC
           interceptor_gas_cmd = self.params.SNG_INTERCEPTOR_GAS
           self.apply_brake = 0
+          press_regen_paddle = False
           self.apply_gas = self.params.INACTIVE_REGEN
 
         idx = (self.frame // 4) % 4
@@ -319,10 +321,6 @@ class CarController(CarControllerBase):
     new_actuators.gas = self.apply_gas
     new_actuators.brake = self.apply_brake
     new_actuators.speed = self.apply_speed
-    new_actuators.customReserved1 = float(interceptor_gas_cmd)
-    new_actuators.customReserved2 = float(pedal_gas)
-    new_actuators.customReserved3 = float(pedaloffset)
-    new_actuators.customReserved4 = float(self.regen_paddle_timer)
 
     self.frame += 1
     return new_actuators, can_sends
