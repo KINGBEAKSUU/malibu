@@ -91,12 +91,11 @@ class CarController(CarControllerBase):
     accel_cutoff = -0.5 * gain
     
     if press_regen_paddle:
-      scaled_accel = accel / gain
+      pedal_gas = pedaloffset + (accel / gain) * 0.6
+      pedal_gas = max(pedal_gas, 0.01)
     else:
-      scaled_accel = accel
-
-    pedal_gas = pedaloffset + scaled_accel * 0.6
-    pedal_gas = max(pedal_gas, 0.01 if press_regen_paddle else 0.0)
+      pedal_gas = pedaloffset + accel * 0.6
+      pedal_gas = max(pedal_gas, 0.0)
     pedal_gas = min(pedal_gas, 1.0)
 
     return pedal_gas, press_regen_paddle
