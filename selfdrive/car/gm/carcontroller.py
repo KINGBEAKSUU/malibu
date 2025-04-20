@@ -89,7 +89,7 @@ class CarController(CarControllerBase):
 
     pedaloffset = interp(car_velocity, [0., 3, 6, 30], [0.10, 0.175, 0.240, 0.240])
     accel_cutoff = -0.5 * gain
-    
+
     if press_regen_paddle:
       pedal_gas = pedaloffset + (accel / gain) * 0.6
       pedal_gas = max(pedal_gas, 0.01)
@@ -97,10 +97,10 @@ class CarController(CarControllerBase):
       pedal_gas = clip((pedaloffset + accel * 0.6), 0.0, 1.0)
     pedal_gas = min(pedal_gas, 1.0)
 
-      ####for safety.
-      pedal_gas_max = interp(car_velocity, [0.0, 5, 30], [0.21, 0.3175,  0.3525])
-      pedal_gas = clip(pedal_gas, 0.0, pedal_gas_max)
-      ####for safety. end.
+    ####for safety.
+    pedal_gas_max = interp(car_velocity, [0.0, 5, 30], [0.21, 0.3175,  0.3525])
+    pedal_gas = clip(pedal_gas, 0.0, pedal_gas_max)
+    ####for safety. end.
 
     return pedal_gas, press_regen_paddle
 
@@ -126,7 +126,7 @@ class CarController(CarControllerBase):
       CC.longActive and
       self.regen_paddle_pressed
     )
- 
+
     if regen_active:
       prndl2_value = 7
       regen_paddle_value = 2
@@ -135,7 +135,7 @@ class CarController(CarControllerBase):
       prndl2_value = 6
       regen_paddle_value = 0
       manual_mode = 0
- 
+
     if self.frame % 5 == 0:
       can_sends.append(gmcan.create_regen_paddle_command(self.packer_pt, CanBus.POWERTRAIN, regen_paddle_value))
     elif self.frame % 5 == 2:
