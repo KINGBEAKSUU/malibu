@@ -115,7 +115,7 @@ class CarController(CarControllerBase):
     can_sends = []
 
     # Send regen paddle and PRNDL2 commands at 40Hz using alternating 2/3 frame interval
-    frames_since_last = self.frame - getattr(self, "last_trigger_frame_40hz", -3)
+    frames_since_last = self.frame - getattr(self, "last_trigger_frame_40hz", -4)
     target_wait = 3 if getattr(self, "wait_long_40hz", False) else 2
 
     if frames_since_last >= target_wait:
