@@ -261,16 +261,16 @@ class CarInterface(CarInterfaceBase):
       ret.networkLocation = NetworkLocation.gateway
       ret.radarUnavailable = False
       ret.minEnableSpeed = -1 * CV.MPH_TO_MS
-      ret.minSteerSpeed = 7 * CV.MPH_TO_MS
-      ret.longitudinalTuning.kpBP = [0.]
-      ret.longitudinalTuning.kpV = [1.0]
-      ret.longitudinalTuning.kiBP = [0.]
-      ret.longitudinalTuning.kiV = [.1]
-      ret.longitudinalTuning.kf = 1.0
+      ret.minSteerSpeed = 1 * CV.MPH_TO_MS
+      ret.longitudinalTuning.kpBP = [0.,5.,35.]
+      ret.longitudinalTuning.kpV = [1.2,0.8,0.5]
+      ret.longitudinalTuning.kiBP = [0.,35.]
+      ret.longitudinalTuning.kiV = [0.18,0.12]
+      ret.longitudinalTuning.kf = 0.00006
       ret.stoppingDecelRate = 1.2 # brake_travel/s while trying to stop
       ret.vEgoStopping = 0.2
       ret.vEgoStarting = 0.1
-      ret.stopAccel = -0.7
+      ret.stopAccel = -0.5
       ret.startingState = True
       ret.startAccel = 1.0
 
