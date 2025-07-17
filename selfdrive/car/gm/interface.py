@@ -258,7 +258,6 @@ class CarInterface(CarInterfaceBase):
       CarInterfaceBase.configure_torque_tune(candidate, ret.lateralTuning)
     
     elif candidate in CAR.CHEVROLET_MALIBU_2019:
-      ret.networkLocation = NetworkLocation.fwdCamera
       ret.radarUnavailable = False
       ret.minEnableSpeed = -1 * CV.MPH_TO_MS
       ret.minSteerSpeed = 1 * CV.MPH_TO_MS
