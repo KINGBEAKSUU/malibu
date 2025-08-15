@@ -66,7 +66,6 @@ def create_gas_regen_command(packer, bus, throttle, idx, enabled, at_full_stop):
     "GasRegenFullStopActive": at_full_stop,
     "GasRegenAlwaysOne": 1,
     "GasRegenAlwaysOne2": 1,
-    "GasRegenAlwaysOne3": 1,
   }
 
   dat = packer.make_can_msg("ASCMGasRegenCmd", bus, values)[2]
@@ -177,21 +176,6 @@ def create_lka_icon_command(bus, active, critical, steer):
     dat = b"\x00\x00\x00"
   return make_can_msg(0x104c006c, dat, bus)
 
-def create_prndl2_command(packer, bus, press_regen_paddle):
-  prndl2_value = 7 if press_regen_paddle else 6
-  manual_mode = 1 if press_regen_paddle else 0
-  values = {
-    "Byte0": 0x0C,
-    "Byte1": 0x0C,
-    "Byte2": 0x00,
-    "PRNDL2": prndl2_value,
-    "Byte4": 0x00,
-    "ManualMode": manual_mode,
-    "TransmissionState": 1,
-    "Byte7": 0x00
-  }
-  return packer.make_can_msg("ECMPRDNL2", bus, values)
-
 def create_regen_paddle_command(packer, bus, press_regen_paddle):
   regen_paddle_value = 2 if press_regen_paddle else 0
   values = {
@@ -204,6 +188,21 @@ def create_regen_paddle_command(packer, bus, press_regen_paddle):
     "Byte6": 0
   }
   return packer.make_can_msg("EBCMRegenPaddle", bus, values)
+
+def create_prndl2_command(packer, bus, press_regen_paddle):
+  prndl2_value = 5 if press_regen_paddle else 6
+  manual_mode = 1 if press_regen_paddle else 0
+  values = {
+    "Byte0": 0x0C,
+    "Byte1": 0x0C,
+    "Byte2": 0x00,
+    "PRNDL2": prndl2_value,
+    "Byte4": 0x00,
+    "ManualMode": manual_mode,
+    "TransmissionState": 1,
+    "Byte7": 0x00
+  }
+  return packer.make_can_msg("ECMPRDNL2", bus, values)
 
 def create_gm_cc_spam_command(packer, controller, CS, actuators):
   if controller.params_.get_bool("IsMetric"):

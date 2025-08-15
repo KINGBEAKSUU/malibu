@@ -12,6 +12,7 @@ from openpilot.selfdrive.car.gm.values import CAR, CruiseButtons, CarControllerP
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase, TorqueFromLateralAccelCallbackType, FRICTION_THRESHOLD, LatControlInputs, NanoFFModel
 from openpilot.selfdrive.controls.lib.drive_helpers import get_friction
 
+from openpilot.frogpilot.common.frogpilot_variables import params
 ButtonType = car.CarState.ButtonEvent.Type
 FrogPilotButtonType = custom.FrogPilotCarState.ButtonEvent.Type
 EventName = car.CarEvent.EventName
@@ -27,8 +28,8 @@ CAM_MSG = 0x320  # AEBCmd
 ACCELERATOR_POS_MSG = 0xbe
 
 NON_LINEAR_TORQUE_PARAMS = {
-  CAR.CHEVROLET_BOLT_EUV: [1.8, 1.1, 0.280, -0.045],
-  CAR.CHEVROLET_BOLT_CC: [1.8, 1.1, 0.280, -0.045],
+  CAR.CHEVROLET_BOLT_EUV: [2.6531724862969748, 1.0, 0.1919764879840985, 0.009054123646805178],
+  CAR.CHEVROLET_BOLT_CC: [2.6531724862969748, 1.0, 0.1919764879840985, 0.009054123646805178],
   CAR.GMC_ACADIA: [4.78003305, 1.0, 0.3122, 0.05591772],
   CAR.CHEVROLET_SILVERADO: [3.29974374, 1.0, 0.25571356, 0.0465122]
 }
@@ -72,8 +73,8 @@ class CarInterface(CarInterfaceBase):
     # ToDo: To generalize to other GMs, explore tanh function as the nonlinear
     non_linear_torque_params = NON_LINEAR_TORQUE_PARAMS.get(self.CP.carFingerprint)
     assert non_linear_torque_params, "The params are not defined"
-    a, b, c, d = non_linear_torque_params
-    steer_torque = (sig(latcontrol_inputs.lateral_acceleration * a) * b) + (latcontrol_inputs.lateral_acceleration * c) + d
+    a, b, c, _ = non_linear_torque_params
+    steer_torque = (sig(latcontrol_inputs.lateral_acceleration * a) * b) + (latcontrol_inputs.lateral_acceleration * c)
     return float(steer_torque) + friction
 
   def torque_from_lateral_accel_neural(self, latcontrol_inputs: LatControlInputs, torque_params: car.CarParams.LateralTorqueTuning, lateral_accel_error: float,
@@ -85,7 +86,13 @@ class CarInterface(CarInterfaceBase):
     return float(self.neural_ff_model.predict(inputs)) + friction
 
   def torque_from_lateral_accel(self) -> TorqueFromLateralAccelCallbackType:
+    if self.CP.carFingerprint in (CAR.CHEVROLET_BOLT_EUV, CAR.CHEVROLET_BOLT_CC):
+      self.neural_ff_model = NanoFFModel(NEURAL_PARAMS_PATH, self.CP.carFingerprint)
+      return self.torque_from_lateral_accel_neural
+    elif self.CP.carFingerprint in NON_LINEAR_TORQUE_PARAMS:
       return self.torque_from_lateral_accel_siglin
+    else:
+      return self.torque_from_lateral_accel_linear
 
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs, frogpilot_toggles):
@@ -125,7 +132,7 @@ class CarInterface(CarInterfaceBase):
       ret.vEgoStarting = 0.25
       ret.stopAccel = -0.25
 
-      if ret.experimentalLongitudinalAvailable and experimental_long:
+      if experimental_long:
         ret.pcmCruise = False
         ret.openpilotLongitudinalControl = True
         ret.safetyConfigs[0].safetyParam |= Panda.FLAG_GM_HW_CAM_LONG
