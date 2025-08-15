@@ -303,14 +303,14 @@ class ThemeManager:
 
     theme_url = download_link + ext
     print(f"Downloading theme from GitLab: {theme_name}")
-    download_file(CANCEL_DOWNLOAD_PARAM, theme_path, DOWNLOAD_PROGRESS_PARAM, theme_url, theme_param, self.session)
+    download_file(CANCEL_DOWNLOAD_PARAM, theme_path, DOWNLOAD_PROGRESS_PARAM, theme_url, theme_param, params_memory)
 
     if params_memory.get_bool(CANCEL_DOWNLOAD_PARAM):
-      handle_error(None, "Download cancelled...", "Download cancelled...", theme_param, DOWNLOAD_PROGRESS_PARAM)
+      handle_error(None, "Download cancelled...", "Download cancelled...", theme_param, DOWNLOAD_PROGRESS_PARAM, params_memory)
       self.downloading_theme = False
       return
 
-    if verify_download(theme_path, theme_url, self.session):
+    if verify_download(theme_path, theme_url):
       print(f"Theme {theme_name} downloaded and verified successfully from GitLab!")
       if ext == ".zip":
         params_memory.put(DOWNLOAD_PROGRESS_PARAM, "Unpacking theme...")
@@ -323,7 +323,7 @@ class ThemeManager:
   def download_theme(self, theme_component, theme_name, theme_param):
     self.downloading_theme = True
 
-    repo_url = get_repository_url(self.session)
+    repo_url = get_repository_url()
     if not repo_url:
       handle_error(None, "GitHub and GitLab are offline...", "Repository unavailable", theme_param, DOWNLOAD_PROGRESS_PARAM)
       self.downloading_theme = False
@@ -345,14 +345,14 @@ class ThemeManager:
 
       theme_url = download_link + ext
       print(f"Downloading theme from GitHub: {theme_name}")
-      download_file(CANCEL_DOWNLOAD_PARAM, theme_path, DOWNLOAD_PROGRESS_PARAM, theme_url, theme_param, self.session)
+      download_file(CANCEL_DOWNLOAD_PARAM, theme_path, DOWNLOAD_PROGRESS_PARAM, theme_url, theme_param, params_memory)
 
       if params_memory.get_bool(CANCEL_DOWNLOAD_PARAM):
-        handle_error(None, "Download cancelled...", "Download cancelled...", theme_param, DOWNLOAD_PROGRESS_PARAM)
+        handle_error(None, "Download cancelled...", "Download cancelled...", theme_param, DOWNLOAD_PROGRESS_PARAM, params_memory)
         self.downloading_theme = False
         return
 
-      if verify_download(theme_path, theme_url, self.session):
+      if verify_download(theme_path, theme_url):
         print(f"Theme {theme_name} downloaded and verified successfully from GitHub!")
         if ext == ".zip":
           params_memory.put(DOWNLOAD_PROGRESS_PARAM, "Unpacking theme...")
@@ -364,7 +364,7 @@ class ThemeManager:
         self.downloading_theme = False
         return
 
-    handle_error(download_path, "Download failed...", "Download failed...", theme_param, DOWNLOAD_PROGRESS_PARAM)
+    handle_error(download_path, "Download failed...", "Download failed...", theme_param, DOWNLOAD_PROGRESS_PARAM, params_memory)
     self.downloading_theme = False
 
   def fetch_assets(self, repo_url):
@@ -380,7 +380,7 @@ class ThemeManager:
         if "github" in repo_url:
           api_url = f"https://api.github.com/repos/{RESOURCES_REPO}/git/trees/{branch}?recursive=1"
         elif "gitlab" in repo_url:
-          api_url = f"https://gitlab.com/api/v4/projects/{RESOURCES_REPO.replace('/', '%2F')}/repository/tree?ref={branch}&recursive=true"
+          api_url = f"https://gitlab.com/api/v4/projects/firestar5683%2FFrogPilot-Resources/repository/tree?ref={branch}&recursive=true"
         else:
           print(f"Unsupported repository URL: {repo_url}")
           return assets
@@ -417,7 +417,7 @@ class ThemeManager:
 
       return {**assets, "themes": {k: list(v) for k, v in assets["themes"].items()}}
     except requests.exceptions.RequestException as error:
-      handle_request_error(f"Failed to fetch theme sizes from {'GitHub' if 'github' in repo_url else 'GitLab'}: {error}", None, None, None)
+      handle_request_error(error, None, None, None, params_memory)
       return {}
 
   def update_theme_params(self, downloadable_colors, downloadable_distance_icons, downloadable_icons, downloadable_signals, downloadable_sounds, downloadable_wheels):
@@ -493,7 +493,7 @@ class ThemeManager:
     if self.downloading_theme:
       return
 
-    repo_url = get_repository_url(self.session)
+    repo_url = get_repository_url()
     if repo_url is None:
       print("GitHub and GitLab are offline...")
       return

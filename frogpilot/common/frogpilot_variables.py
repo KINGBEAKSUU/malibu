@@ -39,11 +39,15 @@ CRUISING_SPEED = 5                        # Roughly the speed cars go when not t
 EARTH_RADIUS = 6378137                    # Radius of the Earth in meters
 MINIMUM_LATERAL_ACCELERATION = 1.3        # m/s^2, typical minimum lateral acceleration when taking curves
 PLANNER_TIME = ModelConstants.T_IDXS[-1]  # Length of time the model projects out for
+
 THRESHOLD = 0.63                          # Requires the condition to be true for ~1 second
+
+def scale_threshold(v_ego):
+  return 0.0 if v_ego > 31.3 else np.interp(v_ego, [0, 17.9, 26.8, 35.8, 44.7], [0.63, 0.63, 0.65, 0.95, 0.95])
 
 NON_DRIVING_GEARS = [GearShifter.neutral, GearShifter.park, GearShifter.reverse, GearShifter.unknown]
 
-RESOURCES_REPO = "FrogAi/FrogPilot-Resources"
+RESOURCES_REPO = "firestar5683/StarPilot-Resources"
 
 ACTIVE_THEME_PATH = Path(__file__).parents[1] / "assets/active_theme"
 METADATAS_PATH = Path(__file__).parents[1] / "assets/model_metadata"
@@ -332,11 +336,11 @@ frogpilot_default_params: list[tuple[str, str | bytes, int, str]] = [
   ("RecordFront", "0", 0, "0"),
   ("RefuseVolume", "101", 2, "101"),
   ("RelaxedFollow", "1.75", 2, "1.75"),
-  ("RelaxedJerkAcceleration", "100", 3, "100"),
+  ("RelaxedJerkAcceleration", "50", 3, "50"),
   ("RelaxedJerkDanger", "100", 3, "100"),
-  ("RelaxedJerkDeceleration", "100", 3, "100"),
-  ("RelaxedJerkSpeed", "100", 3, "100"),
-  ("RelaxedJerkSpeedDecrease", "100", 3, "100"),
+  ("RelaxedJerkDeceleration", "50", 3, "50"),
+  ("RelaxedJerkSpeed", "50", 3, "50"),
+  ("RelaxedJerkSpeedDecrease", "50", 3, "50"),
   ("RelaxedPersonalityProfile", "1", 2, "0"),
   ("ReverseCruise", "0", 1, "0"),
   ("RoadEdgesWidth", "2", 2, "2"),
@@ -388,11 +392,11 @@ frogpilot_default_params: list[tuple[str, str | bytes, int, str]] = [
   ("StartupMessageBottom", "Human-tested, frog-approved 🐸", 0, "Always keep hands on wheel and eyes on road"),
   ("StartupMessageTop", "Hop in and buckle up!", 0, "Be ready to take over at any time"),
   ("StandardFollow", "1.45", 2, "1.45"),
-  ("StandardJerkAcceleration", "100", 3, "100"),
+  ("StandardJerkAcceleration", "50", 3, "50"),
   ("StandardJerkDanger", "100", 3, "100"),
-  ("StandardJerkDeceleration", "100", 3, "100"),
-  ("StandardJerkSpeed", "100", 3, "100"),
-  ("StandardJerkSpeedDecrease", "100", 3, "100"),
+  ("StandardJerkDeceleration", "50", 3, "50"),
+  ("StandardJerkSpeed", "50", 3, "50"),
+  ("StandardJerkSpeedDecrease", "50", 3, "50"),
   ("StandardPersonalityProfile", "1", 2, "0"),
   ("StandbyMode", "0", 2, "0"),
   ("StartAccel", "", 3, ""),
@@ -550,6 +554,7 @@ class FrogPilotVariables:
     is_torque_car = CP.lateralTuning.which() == "torque"
     if not is_torque_car:
       CarInterfaceBase.configure_torque_tune(CP.carFingerprint, CP.lateralTuning)
+
 
     always_on_lateral_set = bool(CP.alternativeExperience & ALTERNATIVE_EXPERIENCE.ALWAYS_ON_LATERAL)
     toggle.car_make = CP.carName
@@ -837,13 +842,14 @@ class FrogPilotVariables:
     toggle.available_models = params.get("AvailableModels", encoding="utf-8") or ""
     toggle.available_model_names = params.get("AvailableModelNames", encoding="utf-8") or ""
     toggle.model_versions = params.get("ModelVersions", encoding="utf-8") or ""
-    downloaded_models = [model for model in toggle.available_models.split(",") if any(MODELS_PATH.glob(f"{model}.*"))]
+    downloaded_models = [model for model in toggle.available_models.split(",") if any(MODELS_PATH.glob(f"{model}*"))]
     toggle.model_randomizer = downloaded_models and (params.get_bool("ModelRandomizer") if tuning_level >= level["ModelRandomizer"] else default.get_bool("ModelRandomizer"))
     if toggle.available_models and toggle.available_model_names and downloaded_models and toggle.model_versions:
-      toggle.available_models += f",{DEFAULT_TINYGRAD_MODEL}"
-      toggle.available_model_names += f",{DEFAULT_TINYGRAD_MODEL_NAME}"
-      toggle.model_versions += f",{DEFAULT_TINYGRAD_MODEL_VERSION}"
-      downloaded_models += [DEFAULT_TINYGRAD_MODEL]
+      if DEFAULT_TINYGRAD_MODEL not in toggle.available_models.split(","):
+        toggle.available_models += f",{DEFAULT_TINYGRAD_MODEL}"
+        toggle.available_model_names += f",{DEFAULT_TINYGRAD_MODEL_NAME}"
+        toggle.model_versions += f",{DEFAULT_TINYGRAD_MODEL_VERSION}"
+        downloaded_models += [DEFAULT_TINYGRAD_MODEL]
       if toggle.model_randomizer:
         if not started:
           blacklisted_models = (params.get("BlacklistedModels", encoding="utf-8") or "").split(",")
@@ -865,7 +871,7 @@ class FrogPilotVariables:
       toggle.model_name = DEFAULT_CLASSIC_MODEL_NAME
       toggle.model_version = DEFAULT_CLASSIC_MODEL_VERSION
     toggle.classic_model = toggle.model_version in {"v1", "v2", "v3", "v4"}
-    toggle.tinygrad_model = toggle.model_version in {"v7"}
+    toggle.tinygrad_model = toggle.model_version in {"v8", "v9", "v10"}
     toggle.tomb_raider = toggle.model == "space-lab"
 
     toggle.model_ui = params.get_bool("ModelUI") if tuning_level >= level["ModelUI"] else default.get_bool("ModelUI")
