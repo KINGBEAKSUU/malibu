@@ -195,6 +195,15 @@ class ModelState:
 
     self.policy_output = self.policy_run(**self.policy_inputs).numpy().flatten()
     policy_outputs_dict = self.parser.parse_policy_outputs(self.slice_outputs(self.policy_output, self.policy_output_slices))
+    # Defensive handling for generations that removed prev_desired_curv (e.g. v11).
+    if not hasattr(self, 'full_prev_desired_curv'):
+        if 'prev_desired_curv' in self.numpy_inputs:
+            self.numpy_inputs['prev_desired_curv'][:] = 0
+    else:
+        if getattr(self, "policy_generation", "v8") == "v11":
+            self.full_prev_desired_curv.fill(0)
+            if 'prev_desired_curv' in self.numpy_inputs:
+                self.numpy_inputs['prev_desired_curv'][:] = 0
 
     # TODO model only uses last value now
     if hasattr(self, 'full_prev_desired_curv'):
