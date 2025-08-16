@@ -871,7 +871,7 @@ class FrogPilotVariables:
       toggle.model_name = DEFAULT_CLASSIC_MODEL_NAME
       toggle.model_version = DEFAULT_CLASSIC_MODEL_VERSION
     toggle.classic_model = toggle.model_version in {"v1", "v2", "v3", "v4"}
-    toggle.tinygrad_model = toggle.model_version in {"v8", "v9", "v10"}
+    toggle.tinygrad_model = toggle.model_version in {"v8", "v9", "v10", "v11"}
     toggle.tomb_raider = toggle.model == "space-lab"
 
     toggle.model_ui = params.get_bool("ModelUI") if tuning_level >= level["ModelUI"] else default.get_bool("ModelUI")
