@@ -39,8 +39,8 @@ PROCESS_NAME = "frogpilot.tinygrad_modeld.tinygrad_modeld"
 SEND_RAW_PRED = os.getenv('SEND_RAW_PRED')
 
 
-LAT_SMOOTH_SECONDS = 0.2
-LONG_SMOOTH_SECONDS = 0.2
+LAT_SMOOTH_SECONDS = 0.1
+LONG_SMOOTH_SECONDS = 0.3
 MIN_LAT_CONTROL_SPEED = 0.3
 
 
@@ -143,7 +143,6 @@ class ModelState:
     # img buffers are managed in openCL transform code
     self.vision_inputs: dict[str, Tensor] = {}
     self.vision_output = np.zeros(vision_output_size, dtype=np.float32)
-    self.policy_inputs = {k: Tensor(v, device='NPY').realize() for k,v in self.numpy_inputs.items()}
     self.policy_output = np.zeros(policy_output_size, dtype=np.float32)
     self.parser = Parser()
 
@@ -152,6 +151,23 @@ class ModelState:
 
     with open(POLICY_PKL_PATH, "rb") as f:
       self.policy_run = pickle.load(f)
+
+    # Build policy_inputs strictly to what the compiled policy expects (and in that order).
+    expected_names = None
+    try:
+      expected_names = list(self.policy_run.captured.expected_names)  # e.g. ['desire','features_buffer','traffic_convention']
+    except Exception:
+      expected_names = None
+
+    if expected_names:
+      ordered_pairs = []
+      for name in expected_names:
+        if name in self.numpy_inputs:
+          ordered_pairs.append((name, self.numpy_inputs[name]))
+      self.policy_inputs = {k: Tensor(v, device='NPY').realize() for k, v in ordered_pairs}
+    else:
+      # Fallback for older tinygrad builds that don't expose captured arg names
+      self.policy_inputs = {k: Tensor(v, device='NPY').realize() for k, v in self.numpy_inputs.items()}
 
   def slice_outputs(self, model_outputs: np.ndarray, output_slices: dict[str, slice]) -> dict[str, np.ndarray]:
     parsed_model_outputs = {k: model_outputs[np.newaxis, v] for k,v in output_slices.items()}
