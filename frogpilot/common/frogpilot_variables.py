@@ -553,7 +553,7 @@ class FrogPilotVariables:
 
     is_torque_car = CP.lateralTuning.which() == "torque"
     if not is_torque_car:
-      CarInterfaceBase.configure_torque_tune(CP.carFingerprint, CP.lateralTuning)
+      CarInterfaceBase.configure_torque_tune("MOCK", CP.lateralTuning)
 
 
     always_on_lateral_set = bool(CP.alternativeExperience & ALTERNATIVE_EXPERIENCE.ALWAYS_ON_LATERAL)
@@ -642,7 +642,7 @@ class FrogPilotVariables:
     toggle.always_on_lateral_main = toggle.always_on_lateral_set and not toggle.use_lkas_for_aol and (params.get_bool("AlwaysOnLateralMain") if tuning_level >= level["AlwaysOnLateralMain"] else default.get_bool("AlwaysOnLateralMain"))
     toggle.always_on_lateral_pause_speed = params.get_int("PauseAOLOnBrake") if toggle.always_on_lateral_set and tuning_level >= level["PauseAOLOnBrake"] else default.get_int("PauseAOLOnBrake")
 
-    toggle.automatic_updates = (params.get_bool("AutomaticUpdates") if tuning_level >= level["AutomaticUpdates"] and (self.release_branch or self.vetting_branch) else default.get_bool("AutomaticUpdates")) and not BACKUP_PATH.is_file()
+    toggle.automatic_updates = (params.get_bool("AutomaticUpdates") if tuning_level >= level["AutomaticUpdates"] else default.get_bool("AutomaticUpdates"))
 
     toggle.car_model = params.get("CarModel", encoding="utf-8") or toggle.car_model
 
