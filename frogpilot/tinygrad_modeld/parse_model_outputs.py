@@ -95,14 +95,14 @@ class Parser:
                        out_shape=(ModelConstants.LEAD_MHP_SELECTION, ModelConstants.LEAD_TRAJ_LEN, ModelConstants.LEAD_WIDTH))
       else:
         self.parse_mdn('lead', outs, in_N=ModelConstants.LEAD_MHP_N, out_N=ModelConstants.LEAD_MHP_SELECTION,
-                      out_shape=(ModelConstants.LEAD_TRAJ_LEN, ModelConstants.LEAD_WIDTH))
+                       out_shape=(ModelConstants.LEAD_TRAJ_LEN, ModelConstants.LEAD_WIDTH))
     if 'plan' in outs:
-      if outs['plan'].shape[1] > 2 * ModelConstants.PLAN_WIDTH * ModelConstants.IDX_N:
-        self.parse_mdn('plan', outs, in_N=ModelConstants.PLAN_MHP_N, out_N=ModelConstants.PLAN_MHP_SELECTION,
+      if outs['plan'].shape[1] == 2 * ModelConstants.IDX_N * ModelConstants.PLAN_WIDTH:
+        self.parse_mdn('plan', outs, in_N=0, out_N=0,
                        out_shape=(ModelConstants.IDX_N, ModelConstants.PLAN_WIDTH))
       else:
-        self.parse_mdn('plan', outs, in_N=0, out_N=0,
-                      out_shape=(ModelConstants.IDX_N, ModelConstants.PLAN_WIDTH))
+        self.parse_mdn('plan', outs, in_N=ModelConstants.PLAN_MHP_N, out_N=ModelConstants.PLAN_MHP_SELECTION,
+                       out_shape=(ModelConstants.IDX_N, ModelConstants.PLAN_WIDTH))
     if 'lane_lines' in outs:
       self.parse_mdn('lane_lines', outs, in_N=0, out_N=0,
                      out_shape=(ModelConstants.NUM_LANE_LINES, ModelConstants.IDX_N, ModelConstants.LANE_LINES_WIDTH))
