@@ -268,7 +268,8 @@ class LongitudinalPlanner:
       output_a_target_e2e = sm['modelV2'].action.desiredAcceleration
       output_should_stop_e2e = sm['modelV2'].action.shouldStop
 
-      if self.mode == 'acc':
+      # v9 uses a different longitudinal interface; keep MPC-only behavior even in blended mode
+      if self.mode == 'acc' or self.generation == 'v9':
         a_target = output_a_target_mpc
         should_stop = output_should_stop_mpc
       else:
