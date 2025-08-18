@@ -108,8 +108,8 @@ class LongitudinalPlanner:
     self.solverExecutionTime = 0.0
 
   @property
-  def mlsim(self) -> bool:
-    return self.generation == "v8"
+  def mlsim(self):
+      return self.generation in ("v8", "v10", "v11")
 
   def get_mpc_mode(self) -> str:
       """
