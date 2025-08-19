@@ -26,9 +26,9 @@ from openpilot.common.transformations.model import get_warp_matrix
 from openpilot.system import sentry
 from openpilot.selfdrive.car.car_helpers import get_demo_car_params
 from openpilot.selfdrive.controls.lib.desire_helper import DesireHelper
-from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan_tomb_raider, smooth_value, get_curvature_from_plan
+from openpilot.selfdrive.controls.lib.drive_helpers import get_accel_from_plan_tomb_raider, smooth_value
 from openpilot.frogpilot.tinygrad_modeld.parse_model_outputs import Parser
-from openpilot.frogpilot.tinygrad_modeld.fill_model_msg import fill_model_msg, fill_pose_msg, PublishState
+from openpilot.frogpilot.tinygrad_modeld.fill_model_msg import fill_model_msg, fill_pose_msg, PublishState, get_curvature_from_output
 from openpilot.frogpilot.tinygrad_modeld.constants import ModelConstants, Plan
 from openpilot.frogpilot.tinygrad_modeld.models.commonmodel_pyx import DrivingModelFrame, CLContext
 
@@ -45,7 +45,7 @@ MIN_LAT_CONTROL_SPEED = 0.3
 
 
 def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.ModelDataV2.Action,
-                          lat_action_t: float, long_action_t: float, v_ego: float) -> log.ModelDataV2.Action:
+                          lat_action_t: float, long_action_t: float, v_ego: float, mlsim: bool) -> log.ModelDataV2.Action:
     plan = model_output['plan'][0]
     desired_accel, should_stop = get_accel_from_plan_tomb_raider(plan[:,Plan.VELOCITY][:,0],
                                                                  plan[:,Plan.ACCELERATION][:,0],
@@ -53,17 +53,7 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
                                                                  action_t=long_action_t)
     desired_accel = smooth_value(desired_accel, prev_action.desiredAcceleration, LONG_SMOOTH_SECONDS)
 
-    # Some generations do not emit 'desired_curvature'; fall back to curvature computed from plan
-    if 'desired_curvature' in model_output:
-      desired_curvature = model_output['desired_curvature'][0, 0]
-    else:
-      desired_curvature = get_curvature_from_plan(
-        plan[:, Plan.VELOCITY][:, 0],
-        plan[:, Plan.ACCELERATION][:, 0],
-        ModelConstants.T_IDXS,
-        v_ego,
-        lat_action_t,
-      )
+    desired_curvature = get_curvature_from_output(model_output, v_ego, lat_action_t, mlsim=mlsim)
     if v_ego > MIN_LAT_CONTROL_SPEED:
       desired_curvature = smooth_value(desired_curvature, prev_action.desiredCurvature, LAT_SMOOTH_SECONDS)
     else:
@@ -127,6 +117,7 @@ class ModelState:
     # Add policy_generation attribute after loading policy_metadata
     self.policy_generation = policy_metadata.get("generation", policy_metadata.get("version", "v8"))
     self.is_v11 = (self.policy_generation == "v11")
+    self.mlsim = (self.policy_generation in ("v8", "v10", "v11"))
 
     self.frames = {name: DrivingModelFrame(context, ModelConstants.TEMPORAL_SKIP) for name in self.vision_input_names}
     self.prev_desire = np.zeros(ModelConstants.DESIRE_LEN, dtype=np.float32)
@@ -135,9 +126,6 @@ class ModelState:
     self.full_desire = np.zeros((1, ModelConstants.FULL_HISTORY_BUFFER_LEN, ModelConstants.DESIRE_LEN), dtype=np.float32)
     self.temporal_idxs = slice(-1-(ModelConstants.TEMPORAL_SKIP*(ModelConstants.INPUT_HISTORY_BUFFER_LEN-1)), None, ModelConstants.TEMPORAL_SKIP)
 
-    # Optional temporal buffer for previous desired curvature (allocate only if the policy expects it)
-    if getattr(self, 'prev_desired_curv_key', None) is not None:
-      self.full_prev_desired_curv = np.zeros((1, ModelConstants.FULL_HISTORY_BUFFER_LEN, ModelConstants.PREV_DESIRED_CURV_LEN), dtype=np.float32)
 
     # policy inputs (built dynamically to support all generations)
     self.numpy_inputs = {}
@@ -163,6 +151,10 @@ class ModelState:
     elif 'prev_desired_curvs' in self.policy_input_shapes:
       self.prev_desired_curv_key = 'prev_desired_curvs'
       self.numpy_inputs['prev_desired_curvs'] = np.zeros((1, ModelConstants.INPUT_HISTORY_BUFFER_LEN, ModelConstants.PREV_DESIRED_CURV_LEN), dtype=np.float32)
+
+    # Optional temporal buffer for previous desired curvature (allocate only if the policy expects it)
+    if getattr(self, 'prev_desired_curv_key', None) is not None:
+      self.full_prev_desired_curv = np.zeros((1, ModelConstants.FULL_HISTORY_BUFFER_LEN, ModelConstants.PREV_DESIRED_CURV_LEN), dtype=np.float32)
 
 
     # img buffers are managed in openCL transform code
@@ -211,14 +203,14 @@ class ModelState:
     if prepare_only:
       return None
 
-    self.vision_output = self.vision_run(**self.vision_inputs).numpy().flatten()
+    self.vision_output = self.vision_run(**self.vision_inputs).contiguous().realize().uop.base.buffer.numpy()
     vision_outputs_dict = self.parser.parse_vision_outputs(self.slice_outputs(self.vision_output, self.vision_output_slices))
 
     self.full_features_buffer[0,:-1] = self.full_features_buffer[0,1:]
     self.full_features_buffer[0,-1] = vision_outputs_dict['hidden_state'][0, :]
     self.numpy_inputs['features_buffer'][:] = self.full_features_buffer[0, self.temporal_idxs]
 
-    self.policy_output = self.policy_run(**self.policy_inputs).numpy().flatten()
+    self.policy_output = self.policy_run(**self.policy_inputs).contiguous().realize().uop.base.buffer.numpy()
     policy_outputs_dict = self.parser.parse_policy_outputs(self.slice_outputs(self.policy_output, self.policy_output_slices))
 
     # TODO model only uses last value now
@@ -403,7 +395,7 @@ def main(demo=False):
       drivingdata_send = messaging.new_message('drivingModelData')
       posenet_send = messaging.new_message('cameraOdometry')
 
-      action = get_action_from_model(model_output, prev_action, lat_delay + DT_MDL, long_delay + DT_MDL, v_ego)
+      action = get_action_from_model(model_output, prev_action, lat_delay + DT_MDL, long_delay + DT_MDL, v_ego, model.mlsim)
       prev_action = action
       fill_model_msg(drivingdata_send, modelv2_send, model_output, action,
                      publish_state, meta_main.frame_id, meta_extra.frame_id, frame_id,
