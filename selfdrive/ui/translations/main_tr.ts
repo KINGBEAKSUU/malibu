@@ -4209,6 +4209,10 @@ Kendi animasyonlarınızı göndermek mi istiyorsunuz? Onları FrogPilot Discord
         <source>The width of the driving path on the driving screen.&lt;br&gt;&lt;br&gt;Default &lt;b&gt;(1.9 meters)&lt;/b&gt; matches the width of a &lt;b&gt;2019 Lexus ES 350&lt;/b&gt;.</source>
         <translation type="gpt-4o-generated">Sürüş ekranındaki sürüş yolunun genişliği.&lt;br&gt;&lt;br&gt;Varsayılan &lt;b&gt;(1.9 metre)&lt;/b&gt;, bir &lt;b&gt;2019 Lexus ES 350&lt;/b&gt;'nin genişliğiyle eşleşir.</translation>
     </message>
+    <message>
+        <source>Driving Model: Current</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotWheelPanel</name>
