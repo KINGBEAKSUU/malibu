@@ -4207,6 +4207,10 @@ Want to submit your own animations? Share them in the "custom-themes" channel on
         <source>The width of the driving path on the driving screen.&lt;br&gt;&lt;br&gt;Default &lt;b&gt;(1.9 meters)&lt;/b&gt; matches the width of a &lt;b&gt;2019 Lexus ES 350&lt;/b&gt;.</source>
         <translation type="gpt-4o-generated">ความกว้างของเส้นทางขับขี่บนหน้าจอขับขี่&lt;br&gt;&lt;br&gt;ค่าเริ่มต้น &lt;b&gt;(1.9 เมตร)&lt;/b&gt; ตรงกับความกว้างของ &lt;b&gt;2019 Lexus ES 350&lt;/b&gt;</translation>
     </message>
+    <message>
+        <source>Driving Model: Current</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotWheelPanel</name>

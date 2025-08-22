@@ -4211,6 +4211,10 @@ Want to submit your own animations? Share them in the "custom-themes" channel on
         <source>The thickness of the road edges on the driving screen.&lt;br&gt;&lt;br&gt;&lt;b&gt;Default matches half of the &lt;b&gt;MUTCD&lt;/b&gt; lane line width standard of 10 centimeters.</source>
         <translation type="gpt-4o-generated">The thickness of the road edges on the driving screen.&lt;br&gt;&lt;br&gt;&lt;b&gt;By default, it matches half of the &lt;b&gt;MUTCD&lt;/b&gt; lane line width standard of 10 centimeters.</translation>
     </message>
+    <message>
+        <source>Driving Model: Current</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>FrogPilotWheelPanel</name>

@@ -4057,6 +4057,10 @@ Want to submit your own animations? Share them in the "custom-themes" channel on
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <source>Driving Model: Current</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <source>SELECT</source>
         <translation type="unfinished"></translation>
     </message>
