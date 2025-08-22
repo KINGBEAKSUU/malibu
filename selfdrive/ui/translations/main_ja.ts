@@ -4211,10 +4211,6 @@ Want to submit your own animations? Share them in the "custom-themes" channel on
         <source>The width of the driving path on the driving screen.&lt;br&gt;&lt;br&gt;Default &lt;b&gt;(1.9 meters)&lt;/b&gt; matches the width of a &lt;b&gt;2019 Lexus ES 350&lt;/b&gt;.</source>
         <translation type="gpt-4o-generated">運転画面上の走行路の幅。&lt;br&gt;&lt;br&gt;デフォルト &lt;b&gt;(1.9メートル)&lt;/b&gt; は &lt;b&gt;2019 Lexus ES 350&lt;/b&gt; の幅に一致します。</translation>
     </message>
-    <message>
-        <source>Driving Model: Current</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 <context>
     <name>FrogPilotWheelPanel</name>

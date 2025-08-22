@@ -45,7 +45,7 @@ MIN_LAT_CONTROL_SPEED = 0.3
 
 
 def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.ModelDataV2.Action,
-                          lat_action_t: float, long_action_t: float, v_ego: float, mlsim: bool, is_v9: bool) -> log.ModelDataV2.Action:
+                          lat_action_t: float, long_action_t: float, v_ego: float, mlsim: bool) -> log.ModelDataV2.Action:
     plan = model_output['plan'][0]
     desired_accel, should_stop = get_accel_from_plan_tomb_raider(plan[:,Plan.VELOCITY][:,0],
                                                                  plan[:,Plan.ACCELERATION][:,0],
@@ -53,14 +53,7 @@ def get_action_from_model(model_output: dict[str, np.ndarray], prev_action: log.
                                                                  action_t=long_action_t)
     desired_accel = smooth_value(desired_accel, prev_action.desiredAcceleration, LONG_SMOOTH_SECONDS)
 
-    if is_v9:
-      # V9: use desired_curvature if present; otherwise do NOT fall back to plan
-      if 'desired_curvature' in model_output:
-        desired_curvature = float(model_output['desired_curvature'][0, 0])
-      else:
-        desired_curvature = prev_action.desiredCurvature
-    else:
-      desired_curvature = get_curvature_from_output(model_output, v_ego, lat_action_t, mlsim=mlsim)
+    desired_curvature = get_curvature_from_output(model_output, v_ego, lat_action_t, mlsim=mlsim)
     if v_ego > MIN_LAT_CONTROL_SPEED:
       desired_curvature = smooth_value(desired_curvature, prev_action.desiredCurvature, LAT_SMOOTH_SECONDS)
     else:
@@ -89,7 +82,6 @@ class ModelState:
     # Dynamically build paths based on current model ID
     params = Params()
     model_id = params.get("Model", encoding="utf-8")
-    model_version = params.get("ModelVersion", encoding="utf-8")
     model_dir = MODELS_PATH
     VISION_PKL_PATH = model_dir / f"{model_id}_driving_vision_tinygrad.pkl"
     POLICY_PKL_PATH = model_dir / f"{model_id}_driving_policy_tinygrad.pkl"
@@ -123,9 +115,8 @@ class ModelState:
     self.policy_output_slices = policy_metadata['output_slices']
     policy_output_size = policy_metadata['output_shapes']['outputs'][1]
     # Add policy_generation attribute after loading policy_metadata
-    self.policy_generation = model_version or "v8"
+    self.policy_generation = policy_metadata.get("generation", policy_metadata.get("version", "v8"))
     self.is_v11 = (self.policy_generation == "v11")
-    self.is_v9 = (self.policy_generation == "v9")
     self.mlsim = (self.policy_generation in ("v8", "v10", "v11"))
 
     self.frames = {name: DrivingModelFrame(context, ModelConstants.TEMPORAL_SKIP) for name in self.vision_input_names}
@@ -229,7 +220,7 @@ class ModelState:
 
       if self.prev_desired_curv_key is not None:
         # v9 models expect zeros for prev_desired_curv(s); others use history
-        if self.is_v9:
+        if getattr(self, "policy_generation", "v8") == "v9":
           self.numpy_inputs[self.prev_desired_curv_key][:] = 0 * self.full_prev_desired_curv[0, self.temporal_idxs]
         else:
           self.numpy_inputs[self.prev_desired_curv_key][:] = self.full_prev_desired_curv[0, self.temporal_idxs]
@@ -404,7 +395,7 @@ def main(demo=False):
       drivingdata_send = messaging.new_message('drivingModelData')
       posenet_send = messaging.new_message('cameraOdometry')
 
-      action = get_action_from_model(model_output, prev_action, lat_delay + DT_MDL, long_delay + DT_MDL, v_ego, model.mlsim, model.is_v9)
+      action = get_action_from_model(model_output, prev_action, lat_delay + DT_MDL, long_delay + DT_MDL, v_ego, model.mlsim)
       prev_action = action
       fill_model_msg(drivingdata_send, modelv2_send, model_output, action,
                      publish_state, meta_main.frame_id, meta_extra.frame_id, frame_id,
