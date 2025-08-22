@@ -89,12 +89,39 @@ class ModelState:
     # Dynamically build paths based on current model ID
     params = Params()
     model_id = params.get("Model", encoding="utf-8")
-    model_version = params.get("ModelVersion", encoding="utf-8")
+
+    # Try to get ModelVersion, but handle case where parameter doesn't exist
+    model_version = None
+    try:
+      model_version = params.get("ModelVersion", encoding="utf-8")
+    except Exception as e:
+      cloudlog.warning(f"ModelVersion parameter not available: {e}")
+
     model_dir = MODELS_PATH
     VISION_PKL_PATH = model_dir / f"{model_id}_driving_vision_tinygrad.pkl"
     POLICY_PKL_PATH = model_dir / f"{model_id}_driving_policy_tinygrad.pkl"
     VISION_METADATA_PATH = model_dir / f"{model_id}_driving_vision_metadata.pkl"
     POLICY_METADATA_PATH = model_dir / f"{model_id}_driving_policy_metadata.pkl"
+
+    # If ModelVersion is not set or not available, try to determine it from available model data
+    if not model_version:
+      cloudlog.warning(f"ModelVersion not available for model {model_id}, attempting to determine from model data")
+      try:
+        # Try to get version from the model versions JSON file
+        versions_file = model_dir / ".model_versions.json"
+        if versions_file.is_file():
+          import json
+          with open(versions_file, "r") as f:
+            version_map = json.load(f)
+          if model_id in version_map:
+            model_version = version_map[model_id]
+            cloudlog.warning(f"Determined model version from JSON: {model_version}")
+        else:
+          cloudlog.error("Model versions JSON file not found, defaulting to v8")
+          model_version = "v8"
+      except Exception as e:
+        cloudlog.error(f"Failed to determine model version: {e}, defaulting to v8")
+        model_version = "v8"
 
     try:
       with open(VISION_METADATA_PATH, 'rb') as f:

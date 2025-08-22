@@ -317,8 +317,21 @@ class ModelManager:
           current = params.get("Model", encoding="utf-8")
           if current in version_map:
               params.put("ModelVersion", version_map[current])
+              print(f"Successfully synced ModelVersion to {version_map[current]} for model {current}")
+          else:
+              print(f"Warning: Model {current} not found in version map")
       except Exception as e:
           print(f"Failed to sync ModelVersion for {current}: {e}")
+
+      # Also ensure ModelVersion is set for the default model if not already set
+      try:
+          if not params.get("ModelVersion", encoding="utf-8"):
+              default_model = params.get("Model", encoding="utf-8") or DEFAULT_TINYGRAD_MODEL
+              if default_model in version_map:
+                  params.put("ModelVersion", version_map[default_model])
+                  print(f"Set default ModelVersion to {version_map[default_model]} for model {default_model}")
+      except Exception as e:
+          print(f"Failed to set default ModelVersion: {e}")
 
   def update_models(self, boot_run=False):
     if self.downloading_model:
@@ -333,6 +346,18 @@ class ModelManager:
     if model_info:
       self.update_model_params(model_info, repo_url)
       self.check_models(boot_run, repo_url)
+
+      # Ensure ModelVersion is set immediately after updating model params
+      if boot_run:
+        try:
+          current = params.get("Model", encoding="utf-8")
+          if current and current in [model["id"] for model in model_info]:
+            model_index = [model["id"] for model in model_info].index(current)
+            version = model_info[model_index]["version"]
+            params.put("ModelVersion", version)
+            print(f"Boot sync: Set ModelVersion to {version} for model {current}")
+        except Exception as e:
+          print(f"Boot sync failed: {e}")
 
   def download_all_models(self):
     repo_url = get_repository_url()
