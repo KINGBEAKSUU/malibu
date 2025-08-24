@@ -72,7 +72,7 @@ class CarState(CarStateBase):
       ret.gearShifter = self.parse_gear_shifter(self.shifter_values.get(pt_cp.vl["ECMPRDNL2"]["PRNDL2"], None))
 
     if self.CP.flags & GMFlags.NO_ACCELERATOR_POS_MSG.value:
-      ret.brake = pt_cp.vl["EBCMBrakePedalPosition"]["BrakePedalPosition"] / 0xd0
+      ret.brake = pt_cp.vl.get("EBCMBrakePedalPosition", {}).get("BrakePedalPosition", 0) / 0xd0
     else:
       ret.brake = pt_cp.vl.get("ECMAcceleratorPos", {}).get("BrakePedalPos", 0)
     if self.CP.networkLocation == NetworkLocation.fwdCamera and not self.CP.flags & GMFlags.FORCE_BRAKE_C9.value:
