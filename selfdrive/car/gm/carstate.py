@@ -74,7 +74,7 @@ class CarState(CarStateBase):
     if self.CP.flags & GMFlags.NO_ACCELERATOR_POS_MSG.value:
       ret.brake = pt_cp.vl["EBCMBrakePedalPosition"]["BrakePedalPosition"] / 0xd0
     else:
-      ret.brake = pt_cp.vl["ECMAcceleratorPos"]["BrakePedalPos"]
+      ret.brake = pt_cp.vl.get("ECMAcceleratorPos", {}).get("BrakePedalPos", 0)
     if self.CP.networkLocation == NetworkLocation.fwdCamera and not self.CP.flags & GMFlags.FORCE_BRAKE_C9.value:
       ret.brakePressed = pt_cp.vl["ECMEngineStatus"]["BrakePressed"] != 0
     else:
