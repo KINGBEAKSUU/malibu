@@ -15,7 +15,7 @@ from openpilot.common.conversions import Conversions as CV
 from openpilot.common.git import get_short_branch
 from openpilot.common.numpy_fast import clip
 from openpilot.common.params import Params
-from openpilot.common.realtime import config_realtime_process, Priority, Ratekeeper, DT_CTRL
+from openpilot.common.realtime import config_realtime_process, Priority, Ratekeeper, DT_CTRL, DT_MDL
 from openpilot.common.swaglog import cloudlog
 
 from openpilot.selfdrive.car.car_helpers import get_car_interface, get_startup_event
@@ -31,6 +31,7 @@ from openpilot.selfdrive.controls.lib.longcontrol import LongControl
 from openpilot.selfdrive.controls.lib.vehicle_model import VehicleModel
 
 from openpilot.system.hardware import HARDWARE
+from selfdrive.road_speed_limiter import SpeedLimiter
 
 from openpilot.frogpilot.common.frogpilot_variables import get_frogpilot_toggles, params_memory
 from openpilot.frogpilot.controls.lib.frogpilot_acceleration import get_max_allowed_accel
@@ -104,7 +105,7 @@ class Controls:
       ignore += ['roadCameraState', 'wideRoadCameraState']
     self.sm = messaging.SubMaster(['deviceState', 'pandaStates', 'peripheralState', 'modelV2', 'liveCalibration',
                                    'carOutput', 'driverMonitoringState', 'longitudinalPlan', 'liveLocationKalman',
-                                   'managerState', 'liveParameters', 'radarState', 'liveTorqueParameters', 'liveDelay',
+                                   'managerState', 'liveParameters', 'radarState', 'liveTorqueParameters', 'liveDelay', 'naviData',
                                    'testJoystick', 'frogpilotCarState', 'frogpilotPlan'] + self.camera_packets + self.sensor_packets,
                                   ignore_alive=ignore, ignore_avg_freq=ignore+['radarState', 'testJoystick'], ignore_valid=['testJoystick', ],
                                   frequency=int(1/DT_CTRL))
@@ -163,6 +164,15 @@ class Controls:
     self.v_cruise_helper = VCruiseHelper(self.CP)
     self.recalibrating_seen = False
 
+    # NDA neokii
+    self.v_cruise_kph_limit = 0
+    self.slowing_down = False
+    self.slowing_down_sound_alert = False
+    self.second = 0.0
+    self.autoNaviSpeedCtrlStart = float(Params().get("AutoNaviSpeedCtrlStart"))
+    self.autoNaviSpeedCtrlEnd = float(Params().get("AutoNaviSpeedCtrlEnd"))
+
+
     self.can_log_mono_time = 0
 
     if car_recognized and not self.CP.passive and self.CP.secOcRequired and not self.CP.secOcKeyAvailable:
@@ -182,9 +192,7 @@ class Controls:
       self.events.add(EventName.dashcamMode, static=True)
 
     # controlsd is driven by carState, expected at 100Hz
-    self.rk = Ratekeeper(100, print_delay_threshold=None)
-
-    # FrogPilot variables
+    self.rk = Ratekeeper(100, print_delay_threshold=None)    # FrogPilot variables
     self.frogpilot_toggles = get_frogpilot_toggles()
 
     self.belowSteerSpeed_shown = False
@@ -194,11 +202,51 @@ class Controls:
 
     self.display_timer = 0
 
+    # Timer for NDA camera warning (1Hz frequency limiting)
+    self.last_nda_camera_warn_time = 0
+
+    # Radar fault frequency tracking (50 times in 1 second)
+    self.radar_fault_timestamps = []
+    self.radar_fault_threshold = 50
+    self.radar_fault_window = 1.0  # 1 second
+
+    # Communication issues frequency tracking (75 times in 1 second)
+    self.comm_issue_timestamps = []
+    self.comm_issue_avg_freq_timestamps = []
+    self.comm_issue_generic_timestamps = []
+    self.comm_issue_threshold = 50
+    self.comm_issue_window = 1.0 # 1 second
+
+    # LocationdTemporaryError frequency tracking (50 times in 1 second)
+    self.locationd_error_timestamps = []
+    self.locationd_error_threshold = 50
+    self.locationd_error_window = 1.0  # 1 second
+
     self.event_names_to_clear = set()
 
     self.use_old_long = self.frogpilot_toggles.old_long_api
 
     self.has_menu = self.CP.carName == "gm" and not (self.CP.flags & GMFlags.NO_CAMERA.value or self.CP.carFingerprint in CC_ONLY_CAR)
+
+  def reset(self):
+    self.slowing_down = False
+    self.slowing_down_sound_alert = False
+
+  def should_add_frequency_limited_event(self, timestamps_list, threshold, window):
+    """
+    Helper function to determine if an event should be added based on frequency limiting.
+    Returns True if the event should be added (threshold reached), False otherwise.
+    """
+    current_time = time.monotonic()
+    # Add current timestamp
+    timestamps_list.append(current_time)
+
+    # Clean up old timestamps outside the window
+    cutoff_time = current_time - window
+    timestamps_list[:] = [t for t in timestamps_list if t > cutoff_time]
+
+    # Return True if threshold is reached
+    return len(timestamps_list) >= threshold
 
   def set_initial_state(self):
     if REPLAY:
@@ -322,6 +370,14 @@ class Controls:
       if log.PandaState.FaultType.relayMalfunction in pandaState.faults:
         self.events.add(EventName.relayMalfunction)
 
+    # NDA neokii
+    # self.second += DT_CTRL
+    # if self.second > 1.0:
+    #   self.autoNaviSpeedCtrlStart = float(Params().get("AutoNaviSpeedCtrlStart"))
+    #   self.autoNaviSpeedCtrlEnd = float(Params().get("AutoNaviSpeedCtrlEnd"))
+
+    #   self.second = 0.0
+
     # Handle HW and system malfunctions
     # Order is very intentional here. Be careful when modifying this.
     # All events here should at least have NO_ENTRY and SOFT_DISABLE.
@@ -341,8 +397,22 @@ class Controls:
           self.events.add(EventName.cameraFrameRate)
     if not REPLAY and self.rk.lagging:
       self.events.add(EventName.controlsdLagging)
-    if len(self.sm['radarState'].radarErrors) or ((not self.rk.lagging or REPLAY) and not self.sm.all_checks(['radarState'])):
-      self.events.add(EventName.radarFault)
+
+    # Radar fault with frequency limiting (10 times in 30 seconds)
+    radar_fault_detected = len(self.sm['radarState'].radarErrors) or ((not self.rk.lagging or REPLAY) and not self.sm.all_checks(['radarState']))
+    if radar_fault_detected:
+      current_time = time.monotonic()
+      # Add current timestamp
+      self.radar_fault_timestamps.append(current_time)
+
+      # Clean up old timestamps outside the 30-second window
+      cutoff_time = current_time - self.radar_fault_window
+      self.radar_fault_timestamps = [t for t in self.radar_fault_timestamps if t > cutoff_time]
+
+      # Only add event if we have 10 or more faults in the 30-second window
+      if len(self.radar_fault_timestamps) >= self.radar_fault_threshold:
+        self.events.add(EventName.radarFault)
+
     if not self.sm.valid['pandaStates']:
       self.events.add(EventName.usbError)
     if CS.canTimeout:
@@ -354,12 +424,22 @@ class Controls:
     has_disable_events = self.events.contains(ET.NO_ENTRY) and (self.events.contains(ET.SOFT_DISABLE) or self.events.contains(ET.IMMEDIATE_DISABLE))
     no_system_errors = (not has_disable_events) or (len(self.events) == num_events)
     if not self.sm.all_checks() and no_system_errors:
+      # Communication issues with frequency limiting (10 times in 30 seconds)
       if not self.sm.all_alive():
-        self.events.add(EventName.commIssue)
+        if self.should_add_frequency_limited_event(self.comm_issue_timestamps,
+                                                   self.comm_issue_threshold,
+                                                   self.comm_issue_window):
+          self.events.add(EventName.commIssue)
       elif not self.sm.all_freq_ok():
-        self.events.add(EventName.commIssueAvgFreq)
+        if self.should_add_frequency_limited_event(self.comm_issue_avg_freq_timestamps,
+                                                   self.comm_issue_threshold,
+                                                   self.comm_issue_window):
+          self.events.add(EventName.commIssueAvgFreq)
       else:
-        self.events.add(EventName.commIssue)
+        if self.should_add_frequency_limited_event(self.comm_issue_generic_timestamps,
+                                                   self.comm_issue_threshold,
+                                                   self.comm_issue_window):
+          self.events.add(EventName.commIssue)
 
       logs = {
         'invalid': [s for s, valid in self.sm.valid.items() if not valid],
@@ -378,7 +458,11 @@ class Controls:
       if not self.sm['liveLocationKalman'].deviceStable:
         self.events.add(EventName.deviceFalling)
       if not self.sm['liveLocationKalman'].inputsOK:
-        self.events.add(EventName.locationdTemporaryError)
+        # LocationdTemporaryError with frequency limiting (75 times in 1 second)
+        if self.should_add_frequency_limited_event(self.locationd_error_timestamps,
+                                                   self.locationd_error_threshold,
+                                                   self.locationd_error_window):
+          self.events.add(EventName.locationdTemporaryError)
       if not self.sm['liveParameters'].valid and not TESTING_CLOSET and (not SIMULATION or REPLAY):
         self.events.add(EventName.paramsdTemporaryError)
 
@@ -414,8 +498,8 @@ class Controls:
     # TODO: fix simulator
     if not SIMULATION or REPLAY:
       # Not show in first 1 km to allow for driving out of garage. This event shows after 5 minutes
-      if not self.sm['liveLocationKalman'].gpsOK and self.sm['liveLocationKalman'].inputsOK and (self.distance_traveled > 1500):
-        self.events.add(EventName.noGps)
+      # if not self.sm['liveLocationKalman'].gpsOK and self.sm['liveLocationKalman'].inputsOK and (self.distance_traveled > 1500):
+      #   self.events.add(EventName.noGps)
       if self.sm['liveLocationKalman'].gpsOK:
         self.distance_traveled = 0
       self.distance_traveled += CS.vEgo * DT_CTRL
@@ -441,8 +525,8 @@ class Controls:
     if EventName.steerTempUnavailableSilent in event_names:
       self.steerTempUnavailableSilent_shown = True
 
-    if self.belowSteerSpeed_shown and CS.vEgo >= self.CP.minSteerSpeed:
-      self.event_names_to_clear.add(EventName.belowSteerSpeed)
+    # if self.belowSteerSpeed_shown and CS.vEgo >= self.CP.minSteerSpeed:
+    #   self.event_names_to_clear.add(EventName.belowSteerSpeed)
 
     if self.resumeRequired_shown and not CS.cruiseState.standstill and not self.CP.autoResumeSng:
       self.event_names_to_clear.add(EventName.resumeRequired)
@@ -503,6 +587,43 @@ class Controls:
     """Compute conditional state transitions and execute actions on state transitions"""
 
     self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric, self.sm['frogpilotPlan'].speedLimitChanged, self.frogpilot_toggles)
+
+    # NDA neokii
+    apply_limit_speed, road_limit_speed, left_dist, first_started, limit_log = SpeedLimiter.instance().get_max_speed(CS, self.v_cruise_helper.v_cruise_kph, self.autoNaviSpeedCtrlStart, self.autoNaviSpeedCtrlEnd)
+
+    # NDA Camera Warning - 1Hz frequency limited to prevent blocking
+    current_time = time.monotonic()
+    if current_time - self.last_nda_camera_warn_time >= 1.0:  # 1Hz = 1 second interval
+      if CS.vEgo * CV.MS_TO_KPH > (apply_limit_speed * 0.85 ) and left_dist > 2.0:
+        self.events.add(EventName.ndaCameraWarn)
+      self.last_nda_camera_warn_time = current_time
+
+
+    # self.traffic_signal_check_timer += DT_CTRL
+    # if self.traffic_signal_check_timer >= self.TRAFFIC_SIGNAL_CHECK_INTERVAL:
+    #   if self.sm['naviData'].ts.isRedLightOn:
+    #     if self.sm['naviData'].ts.redLightRemainTime < 5:
+    #       self.events.add(EventName.trfficSingalChangingWarnImminent)
+    #       self.traffic_signal_check_timer = 0  # 타이머 리셋
+    #     else:
+    #       self.events.add(EventName.trfficSingalChangingWarn)
+
+
+
+    if apply_limit_speed >= 20:
+      self.v_cruise_kph_limit = min(apply_limit_speed, self.v_cruise_helper.v_cruise_kph)
+
+      if CS.vEgo * CV.MS_TO_KPH > apply_limit_speed:
+      #   self.events.add(EventName.slowingDownSpeedSound)
+
+        if not self.slowing_down:
+          self.slowing_down_sound_alert = True
+          self.slowing_down = True
+        self.slowing_down_sound_alert = True
+
+    else:
+      self.reset()
+      self.v_cruise_kph_limit = self.v_cruise_helper.v_cruise_kph
 
     # decrement the soft disable timer at every step, as it's reset on
     # entrance in SOFT_DISABLING state
@@ -864,7 +985,8 @@ class Controls:
     controlsState.engageable = not self.events.contains(ET.NO_ENTRY)
     controlsState.longControlState = self.LoC.long_control_state
     controlsState.vPid = float(self.LoC.v_pid)
-    controlsState.vCruise = float(self.v_cruise_helper.v_cruise_kph)
+    #controlsState.vCruise = float(self.v_cruise_helper.v_cruise_kph)
+    controlsState.vCruise = float(self.v_cruise_kph_limit)
     controlsState.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
     controlsState.upAccelCmd = float(self.LoC.pid.p)
     controlsState.uiAccelCmd = float(self.LoC.pid.i)

@@ -398,6 +398,71 @@ def torque_nn_load_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubM
       Priority.LOW, VisualAlert.none, AudibleAlert.engage, 5.0)
 
 
+
+
+def nda_camera_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, frogpilot_toggles: SimpleNamespace) -> Alert:
+
+
+  naviData = sm['naviData']
+  road_limit_speed = naviData.roadLimitSpeed
+  cam_limit_speed = naviData.camLimitSpeed
+  cam_limit_speed_left_dist = naviData.camLimitSpeedLeftDist
+  section_limit_speed = naviData.sectionLimitSpeed
+  section_left_dist = naviData.sectionLeftDist
+
+  limit_speed = 0
+  left_dist = 0
+
+
+  # Determine which speed limit to use, prioritizing camera limits over section limits
+  if cam_limit_speed > 0 and cam_limit_speed_left_dist > 0:
+    limit_speed = cam_limit_speed
+    left_dist = cam_limit_speed_left_dist
+  elif section_limit_speed > 0 and section_left_dist > 0:
+    limit_speed = section_limit_speed
+    left_dist = section_left_dist
+  else:
+    # If no specific limits are active, use the road's general speed limit
+    limit_speed = road_limit_speed if 0 < road_limit_speed < 200 else 0
+
+  result = {
+    "speed_text": "",
+    "distance_text": ""
+  }
+
+  # Format the speed limit text
+  if limit_speed > 0 and limit_speed < 200:
+    result["speed_text"] = f"{limit_speed}"
+
+  # Format the distance text (if applicable)
+  if left_dist > 0:
+    if left_dist < 1000:
+      result["distance_text"] = f"{left_dist}m"
+    else:
+      result["distance_text"] = f"{left_dist / 1000.0:.1f}km"
+
+  return Alert(
+    result["speed_text"] + "km/h  📸  "+ result["distance_text"],
+    "",
+    AlertStatus.normal, AlertSize.small,
+    Priority.LOW, VisualAlert.none, AudibleAlert.none, 1.)
+
+#
+#
+# def traffic_signal_changing_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaster, metric: bool, soft_disable_time: int, frogpilot_toggles: SimpleNamespace) -> Alert:
+#
+#   redLightRemainTime = sm['naviData'].ts.redLightRemainTime
+#   # Round up to nearest 5 seconds
+#   roundedTime = math.ceil(redLightRemainTime / 5.0) * 5
+#
+#   return Alert(
+#     "🚦🔴 신호 대기" + f" {roundedTime}초",
+#     "",
+#     AlertStatus.frogpilot, AlertSize.small,
+#     Priority.LOW, VisualAlert.none, AudibleAlert.none, .5)
+#
+
+
 EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
   # ********** events with no alerts **********
 
@@ -1254,7 +1319,37 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
       AlertStatus.frogpilot, AlertSize.small,
       Priority.LOW, VisualAlert.none, AudibleAlert.mail, 3.),
   },
+  EventName.slowingDownSpeedSound: {
+    ET.PERMANENT: Alert(
+      "Slowing down",
+      "",
+      AlertStatus.normal, AlertSize.small,
+      Priority.LOW, VisualAlert.none, AudibleAlert.speedDown, 2.),
+
+  },
+  EventName.ndaCameraWarn: {
+    ET.PERMANENT: nda_camera_alert,
+  },
+
+# return Alert(
+#   result["speed_text"] + "km/h  📸  "+ result["distance_text"],
+#   "",
+#   AlertStatus.normal, AlertSize.small,
+#   Priority.LOW, VisualAlert.none, AudibleAlert.none, .2)
+
+  # EventName.trfficSingalChangingWarn: {
+  #   ET.PERMANENT: traffic_signal_changing_alert,
+  # },
+  # EventName.trfficSingalChangingWarnImminent: {
+  #   ET.WARNING: Alert(
+  #     "🚦🔴 신호가 곧 바뀝니다",
+  #     "",
+  #     AlertStatus.userPrompt, AlertSize.mid,
+  #     Priority.HIGHEST, VisualAlert.steerRequired, AudibleAlert.promptRepeat, 3.),
+  # },
 }
+
+
 
 if __name__ == '__main__':
   # print all alerts by type and priority
