@@ -142,11 +142,13 @@ static void gm_rx_hook(const CANPacket_t *to_push) {
 
     // Reference for brake pressed signals:
     // https://github.com/commaai/openpilot/blob/master/selfdrive/car/gm/carstate.py
-    if ((addr == 0xBE) && ((gm_hw == GM_ASCM) || (gm_hw == GM_SDGM) || gm_force_brake_c9)) {
+    // Prefer 0xC9 (ECMEngineStatus) when gm_force_brake_c9 is set, otherwise keep legacy behavior.
+    // This allows SDGM/Traverse variants without 0xBE (ECMAcceleratorPos) to report brake correctly.
+    if ((addr == 0xC9) && gm_force_brake_c9) {
+      brake_pressed = GET_BIT(to_push, 40U) != 0U;
+    } else if ((addr == 0xBE) && ((gm_hw == GM_ASCM) || (gm_hw == GM_SDGM))) {
       brake_pressed = GET_BYTE(to_push, 1) >= 8U;
-    }
-
-    if ((addr == 0xC9) && ((gm_hw == GM_CAM) && !gm_force_brake_c9)) {
+    } else if ((addr == 0xC9) && (gm_hw == GM_CAM)) {
       brake_pressed = GET_BIT(to_push, 40U) != 0U;
     }
 
