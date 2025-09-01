@@ -432,6 +432,17 @@
     </message>
 </context>
 <context>
+    <name>ExpandableMultiOptionDialog</name>
+    <message>
+        <source>Select</source>
+        <translation type="unfinished">เลือก</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="unfinished">ยกเลิก</translation>
+    </message>
+</context>
+<context>
     <name>ExperimentalModeButton</name>
     <message>
         <source>EXPERIMENTAL MODE ON</source>
