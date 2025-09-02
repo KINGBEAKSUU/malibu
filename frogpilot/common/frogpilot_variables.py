@@ -43,7 +43,8 @@ PLANNER_TIME = ModelConstants.T_IDXS[-1]  # Length of time the model projects ou
 THRESHOLD = 0.63                          # Requires the condition to be true for ~1 second
 
 def scale_threshold(v_ego):#0   40    60    80   100       0    40    60   80   100
-  return np.interp(v_ego, [0, 17.9, 26.8, 35.8, 44.7], [0.61, 0.63, 0.65, 0.8, 0.95])
+  # More aggressive with hysteresis and lead probability: faster activation at higher speeds
+  return np.interp(v_ego, [0, 17.9, 26.8, 35.8, 44.7], [0.58, 0.60, 0.62, 0.72, 0.82])
 
 NON_DRIVING_GEARS = [GearShifter.neutral, GearShifter.park, GearShifter.reverse, GearShifter.unknown]
 

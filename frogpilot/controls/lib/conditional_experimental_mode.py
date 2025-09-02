@@ -8,13 +8,15 @@ class ConditionalExperimentalMode:
   def __init__(self, FrogPilotPlanner):
     self.frogpilot_planner = FrogPilotPlanner
 
-    self.curvature_filter = FirstOrderFilter(0, 1, DT_MDL)
-    self.slow_lead_filter = FirstOrderFilter(0, 1, DT_MDL)
-    self.stop_light_filter = FirstOrderFilter(0, 1, DT_MDL)
+    # Faster filters with hysteresis for better responsiveness
+    self.curvature_filter = FirstOrderFilter(0, 0.8, DT_MDL)
+    self.slow_lead_filter = FirstOrderFilter(0, 0.8, DT_MDL)
+    self.stop_light_filter = FirstOrderFilter(0, 0.8, DT_MDL)
 
     self.curve_detected = False
     self.experimental_mode = False
     self.stop_light_detected = False
+    self.prev_experimental_mode = False  # For hysteresis
 
   def update(self, v_ego, sm, frogpilot_toggles):
     if frogpilot_toggles.experimental_mode_via_press:
@@ -24,7 +26,26 @@ class ConditionalExperimentalMode:
 
     if self.status_value not in {1, 2} and not sm["carState"].standstill:
       self.update_conditions(v_ego, sm, frogpilot_toggles)
+      new_experimental_mode = self.check_conditions(v_ego, sm, frogpilot_toggles)
+
+      # Add hysteresis to prevent rapid toggling
+      if new_experimental_mode and not self.prev_experimental_mode:
+        # Require weaker conditions to turn on
+        hysteresis_factor = 0.9
+      elif not new_experimental_mode and self.prev_experimental_mode:
+        # Require stronger conditions to turn off
+        hysteresis_factor = 1.2
+      else:
+        hysteresis_factor = 1.0
+
+      # Apply hysteresis to key conditions
+      if hasattr(self, 'slow_lead_detected'):
+        self.slow_lead_detected = self.slow_lead_detected if hysteresis_factor == 1.0 else (self.slow_lead_filter.x >= scale_threshold(v_ego) * hysteresis_factor)
+      if hasattr(self, 'curve_detected'):
+        self.curve_detected = self.curve_detected if hysteresis_factor == 1.0 else (self.curvature_filter.x >= THRESHOLD * hysteresis_factor)
+
       self.experimental_mode = self.check_conditions(v_ego, sm, frogpilot_toggles)
+      self.prev_experimental_mode = self.experimental_mode
       params_memory.put_int("CEStatus", self.status_value if self.experimental_mode else 0)
     else:
       self.experimental_mode = self.status_value == 2 or sm["carState"].standstill and self.experimental_mode and self.frogpilot_planner.model_stopped
@@ -83,8 +104,12 @@ class ConditionalExperimentalMode:
       stopped_lead = frogpilot_toggles.conditional_stopped_lead and v_lead < 1
       lead_threshold = scale_threshold(v_ego)
 
+      # Adjust threshold based on lead probability for vision-only accuracy
+      lead_prob = getattr(self.frogpilot_planner.lead_one, 'modelProb', 1.0)
+      adjusted_threshold = lead_threshold * (1.0 + 0.2 * (1.0 - lead_prob))  # Higher threshold for lower confidence
+
       self.slow_lead_filter.update(slower_lead or stopped_lead)
-      self.slow_lead_detected = self.slow_lead_filter.x >= lead_threshold
+      self.slow_lead_detected = self.slow_lead_filter.x >= adjusted_threshold
     else:
       self.slow_lead_filter.x = 0
       self.slow_lead_detected = False
