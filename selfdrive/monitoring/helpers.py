@@ -261,7 +261,7 @@ class DriverMonitoring:
                                     driver_data.readyProb, driver_data.notReadyProb)):
       return
 
-    self.face_detected = True#driver_data.faceProb > self.settings._FACE_THRESHOLD
+    self.face_detected = True #driver_data.faceProb > self.settings._FACE_THRESHOLD
     self.pose.roll, self.pose.pitch, self.pose.yaw = face_orientation_from_net(driver_data.faceOrientation, driver_data.facePosition, cal_rpy)
     if self.wheel_on_right:
       self.pose.yaw *= -1
