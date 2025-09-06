@@ -228,6 +228,8 @@ class Controls:
 
     self.has_menu = self.CP.carName == "gm" and not (self.CP.flags & GMFlags.NO_CAMERA.value or self.CP.carFingerprint in CC_ONLY_CAR)
 
+    self.log_counter = 0
+
   def reset(self):
     self.slowing_down = False
     self.slowing_down_sound_alert = False
@@ -588,8 +590,15 @@ class Controls:
 
     self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric, self.sm['frogpilotPlan'].speedLimitChanged, self.frogpilot_toggles)
 
+    self.log_counter += 1
+    if self.log_counter % 10 == 0:
+      cloudlog.info(f"Calling SpeedLimiter.get_max_speed with CS.vEgo={CS.vEgo}, v_cruise={self.v_cruise_helper.v_cruise_kph}")
+
     # NDA neokii
     apply_limit_speed, road_limit_speed, left_dist, first_started, limit_log = SpeedLimiter.instance().get_max_speed(CS, self.v_cruise_helper.v_cruise_kph, self.autoNaviSpeedCtrlStart, self.autoNaviSpeedCtrlEnd)
+
+    if self.log_counter % 10 == 0:
+      cloudlog.info(f"SpeedLimiter returned: apply_limit_speed={apply_limit_speed}, road_limit_speed={road_limit_speed}, left_dist={left_dist}, first_started={first_started}, limit_log={limit_log}")
 
     # NDA Camera Warning - 1Hz frequency limited to prevent blocking
     current_time = time.monotonic()

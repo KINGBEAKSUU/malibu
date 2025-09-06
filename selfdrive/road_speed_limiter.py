@@ -99,6 +99,9 @@ class NaviServer:
           self.lock = None
 
 
+    self.log_counter = 0
+
+
   def gps_thread(self):
     try:
       last_run_time = time.monotonic()
@@ -249,11 +252,18 @@ class NaviServer:
   def udp_recv(self, sock):
     ret = False
     try:
-      ready = select.select([sock], [], [], 0.001)
+      ready = select.select([sock], [], [], 0.5)
       ret = bool(ready[0])
       if ret:
         data, self.remote_addr = sock.recvfrom(2048)
-        json_obj = json.loads(data.decode())
+        # json_obj = json.loads(data.decode())
+####
+        json_str = data.decode()  # 디코딩된 문자열
+        self.log_counter += 1
+        if self.log_counter % 10 == 0:
+          cloudlog.info(f"UDP received JSON: {json_str}")  # 수신된 JSON 로그
+        json_obj = json.loads(json_str)
+#####
 
         if 'cmd' in json_obj:
           try:
@@ -373,6 +383,8 @@ def main():
   sock = None
   last_sent_data = None  # Track last sent data for change detection
 
+  log_counter = 0
+
   def should_send_data(new_dat):
     # nonlocal last_sent_data
     # if last_sent_data is None:
@@ -386,7 +398,7 @@ def main():
     #     except AttributeError:
     #         return True  # If field doesn't exist, send data
     # return False
-    return true
+    return True
 
   try:
     try:
@@ -417,6 +429,7 @@ def main():
         return
 
       while not terminate_flag.is_set():
+        log_counter += 1
         try:
           if server is not None:
             server.udp_recv(sock)
@@ -439,6 +452,9 @@ def main():
               dat.naviData.camSpeedFactor = server.get_limit_val("cam_speed_factor", CAMERA_SPEED_FACTOR) if server is not None else CAMERA_SPEED_FACTOR
               dat.naviData.currentRoadName = server.get_limit_val("current_road_name", "") if server is not None else ""
               dat.naviData.isNda2 = server.get_limit_val("is_nda2", False) if server is not None else False
+              if log_counter % 10 == 0:
+                cloudlog.info(f"naviData created: active={dat.naviData.active}, roadLimitSpeed={dat.naviData.roadLimitSpeed}, camLimitSpeed={dat.naviData.camLimitSpeed}")  # naviData 로그
+
             except Exception as e:
               cloudlog.info(f"NaviData creation error: {e}")
               continue

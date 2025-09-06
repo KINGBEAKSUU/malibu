@@ -445,7 +445,7 @@ def nda_camera_alert(CP: car.CarParams, CS: car.CarState, sm: messaging.SubMaste
     result["speed_text"] + "km/h  📸  "+ result["distance_text"],
     "",
     AlertStatus.normal, AlertSize.small,
-    Priority.LOW, VisualAlert.none, AudibleAlert.none, 1.)
+    Priority.LOW, VisualAlert.none, AudibleAlert.none, 1.5)
 
 #
 #
