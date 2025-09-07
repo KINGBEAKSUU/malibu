@@ -228,7 +228,6 @@ class Controls:
 
     self.has_menu = self.CP.carName == "gm" and not (self.CP.flags & GMFlags.NO_CAMERA.value or self.CP.carFingerprint in CC_ONLY_CAR)
 
-    self.log_counter = 0
 
   def reset(self):
     self.slowing_down = False
@@ -590,19 +589,14 @@ class Controls:
 
     self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric, self.sm['frogpilotPlan'].speedLimitChanged, self.frogpilot_toggles)
 
-    self.log_counter += 1
-    if self.log_counter % 10 == 0:
-      cloudlog.info(f"Calling SpeedLimiter.get_max_speed with CS.vEgo={CS.vEgo}, v_cruise={self.v_cruise_helper.v_cruise_kph}")
+
 
     # NDA neokii
     apply_limit_speed, road_limit_speed, left_dist, first_started, limit_log = SpeedLimiter.instance().get_max_speed(CS, self.v_cruise_helper.v_cruise_kph, self.autoNaviSpeedCtrlStart, self.autoNaviSpeedCtrlEnd)
 
-    if self.log_counter % 10 == 0:
-      cloudlog.info(f"SpeedLimiter returned: apply_limit_speed={apply_limit_speed}, road_limit_speed={road_limit_speed}, left_dist={left_dist}, first_started={first_started}, limit_log={limit_log}")
-
     # NDA Camera Warning - 1Hz frequency limited to prevent blocking
     current_time = time.monotonic()
-    if current_time - self.last_nda_camera_warn_time >= 1.0:  # 1Hz = 1 second interval
+    if current_time - self.last_nda_camera_warn_time >= 0.8:  # 1Hz = 1 second interval
       if CS.vEgo * CV.MS_TO_KPH > (apply_limit_speed * 0.85 ) and left_dist > 2.0:
         self.events.add(EventName.ndaCameraWarn)
       self.last_nda_camera_warn_time = current_time
