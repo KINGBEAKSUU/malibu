@@ -384,7 +384,10 @@ class LongitudinalMpc:
     self.current_dist_adapt = interp(speed_mph, bp, [low_dist_adapt, low_dist_adapt, tuned_dist_adapt])
 
     # Update filter time constants with interp and recreate filters if needed
-    self.current_filter_time = interp(speed_mph, bp, [low_lead_filter_time, low_lead_filter_time, LEAD_FILTER_TIME_HIGH])
+    if speed_mph < 25:
+        self.current_filter_time = 0.0
+    else:
+        self.current_filter_time = interp(speed_mph, bp, [low_lead_filter_time, low_lead_filter_time, LEAD_FILTER_TIME_HIGH])
     if abs(self.current_filter_time - getattr(self, 'prev_filter_time', 0)) > 0.1:  # Only update if significant change
       # Recreate filters with new time constant while preserving current values
       current_a = self.lead_a_filter.x if hasattr(self.lead_a_filter, 'x') else 0.0
