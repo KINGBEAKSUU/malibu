@@ -3,7 +3,7 @@ import os
 import time
 import numpy as np
 from cereal import log
-from openpilot.common.numpy_fast import clip
+from openpilot.common.numpy_fast import clip, interp
 from openpilot.common.realtime import DT_MDL
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.filter_simple import FirstOrderFilter
@@ -44,15 +44,15 @@ SPEED_BREAKPOINTS = [0, 35, 55, 70]  # 4 ranges: 0-35, 35-55, 55-70, 70+
 
 # RESPONSIVENESS TO LEAD CARS (Lower = More responsive, Higher = More stable)
 # [City Emergency, Urban Hwy, Rural Hwy, High Speed]
-X_EGO_OBSTACLE_COSTS = [1.8, 3.0, 2.8, 2.2]  # Highway more responsive to prevent gaps
+X_EGO_OBSTACLE_COSTS = [3.0, 3.0, 2.75, 2.2]  # Less aggressive at low speeds, closer to original
 
 # JERK CONTROL (Lower = More jerky/responsive, Higher = Smoother/conservative)
 # [City Emergency, Urban Hwy, Rural Hwy, High Speed]
-J_EGO_COSTS = [2.5, 6.0, 5.6, 4.5]  # Slight nudge for 55-70 mph responsiveness
+J_EGO_COSTS = [5.0, 4.75, 4.5, 4.25]  # Reverted to original 5.0 at low speeds
 
 # ACCELERATION CHANGE PENALTIES (Lower = More responsive, Higher = Smoother)
 # [City Emergency, Urban Hwy, Rural Hwy, High Speed]
-A_CHANGE_COSTS = [150, 250, 250, 180]  # Highway more responsive to changes
+A_CHANGE_COSTS = [200, 195, 190, 180]  # Reverted to original 200 at low speeds
 
 # SMOOTHING FILTERS - Speed-adaptive for optimal responsiveness
 # Lower = More responsive, Higher = Smoother
@@ -358,25 +358,45 @@ class LongitudinalMpc:
       self.solver.cost_set(i, 'Zl', Zl)
 
   def set_weights(self, acceleration_jerk=1.0, danger_jerk=1.0, speed_jerk=1.0, prev_accel_constraint=True, personality=log.LongitudinalPersonality.standard, v_ego=0.0, lead_dist=50.0):
-    # Update parameters based on current speed (use instance variables, not globals)
+    # Update parameters based on current speed with interpolation for smooth scaling
     speed_mph = v_ego * CV.MS_TO_MPH  # Convert m/s to mph
 
-    self.current_x_ego_cost = get_speed_based_param(speed_mph, X_EGO_OBSTACLE_COSTS)
-    self.current_j_ego_cost = get_speed_based_param(speed_mph, J_EGO_COSTS)
-    self.current_a_change_cost = get_speed_based_param(speed_mph, A_CHANGE_COSTS)
-    self.current_dist_adapt = get_speed_based_param(speed_mph, DIST_ADAPTS)
+    # Breakpoints for interpolation: [0, 20, 35]
+    bp = [0, 20, 35]
+    # Original low values
+    low_x_cost = 3.0
+    low_j_cost = 5.0
+    low_a_change_cost = 200
+    low_dist_adapt = 0.0
+    low_lead_filter_time = 0.8  # No smoothing
 
-    # Update filter time constants based on speed and recreate filters if needed
-    new_filter_time = LEAD_FILTER_TIME_LOW if speed_mph < SPEED_FILTER_THRESHOLD else LEAD_FILTER_TIME_HIGH
-    if abs(self.current_filter_time - new_filter_time) > 0.1:  # Only update if significant change
-      self.current_filter_time = new_filter_time
+    # Tuned at 35 mph (index 1 in arrays)
+    tuned_x_cost = X_EGO_OBSTACLE_COSTS[1]
+    tuned_j_cost = J_EGO_COSTS[1]
+    tuned_a_change_cost = A_CHANGE_COSTS[1]
+    tuned_dist_adapt = DIST_ADAPTS[1]
+    tuned_lead_filter_time = 1.0  # Interp to higher
+
+    # Interp for smooth scaling in 20-35 mph
+    self.current_x_ego_cost = interp(speed_mph, bp, [low_x_cost, low_x_cost, tuned_x_cost])
+    self.current_j_ego_cost = interp(speed_mph, bp, [low_j_cost, low_j_cost, tuned_j_cost])
+    self.current_a_change_cost = interp(speed_mph, bp, [low_a_change_cost, low_a_change_cost, tuned_a_change_cost])
+    self.current_dist_adapt = interp(speed_mph, bp, [low_dist_adapt, low_dist_adapt, tuned_dist_adapt])
+
+    # Update filter time constants with interp and recreate filters if needed
+    if speed_mph < 25:
+        self.current_filter_time = 0.0
+    else:
+        self.current_filter_time = interp(speed_mph, bp, [low_lead_filter_time, low_lead_filter_time, LEAD_FILTER_TIME_HIGH])
+    if abs(self.current_filter_time - getattr(self, 'prev_filter_time', 0)) > 0.1:  # Only update if significant change
       # Recreate filters with new time constant while preserving current values
       current_a = self.lead_a_filter.x if hasattr(self.lead_a_filter, 'x') else 0.0
       current_v = self.lead_v_filter.x if hasattr(self.lead_v_filter, 'x') else 0.0
       self.lead_a_filter = FirstOrderFilter(current_a, self.current_filter_time, self.dt)
       self.lead_v_filter = FirstOrderFilter(current_v, self.current_filter_time, self.dt)
+      self.prev_filter_time = self.current_filter_time
 
-    # Adaptive jerk factors for distance (close lead = more conservative)
+    # Adaptive jerk factors for distance with interp scaling
     dist_factor = 1.0 + self.current_dist_adapt * (20.0 / max(lead_dist, 5.0))
     acceleration_jerk *= dist_factor
     danger_jerk *= dist_factor
@@ -403,10 +423,28 @@ class LongitudinalMpc:
         self.solver.set(i, 'x', self.x0)
 
   @staticmethod
-  def extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau):
-    # Use constant acceleration model for smoother predictions
-    v_lead_traj = np.clip(v_lead + a_lead * T_IDXS, 0.0, 1e8)
-    x_lead_traj = x_lead + v_lead * T_IDXS + 0.5 * a_lead * T_IDXS**2
+  def extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau, v_ego=0.0):
+    speed_mph = v_ego * CV.MS_TO_MPH
+    bp = [0, 20, 35]
+    exp_weight = interp(speed_mph, bp, [1.0, 1.0, 0.0])  # Full exp at <20, blend to constant at 35
+
+    if exp_weight > 0:
+      # Exponential decay component
+      a_lead_traj_exp = a_lead * np.exp(-a_lead_tau * (T_IDXS**2)/2.)
+      v_lead_traj_exp = np.clip(v_lead + np.cumsum(T_DIFFS * a_lead_traj_exp), 0.0, 1e8)
+      x_lead_traj_exp = x_lead + np.cumsum(T_DIFFS * v_lead_traj_exp)
+    else:
+      x_lead_traj_exp = np.zeros_like(T_IDXS)
+      v_lead_traj_exp = np.zeros_like(T_IDXS)
+
+    # Constant acceleration component
+    v_lead_traj_const = np.clip(v_lead + a_lead * T_IDXS, 0.0, 1e8)
+    x_lead_traj_const = x_lead + v_lead * T_IDXS + 0.5 * a_lead * T_IDXS**2
+
+    # Blend based on weight
+    v_lead_traj = exp_weight * v_lead_traj_exp + (1 - exp_weight) * v_lead_traj_const
+    x_lead_traj = exp_weight * x_lead_traj_exp + (1 - exp_weight) * x_lead_traj_const
+
     lead_xv = np.column_stack((x_lead_traj, v_lead_traj))
     return lead_xv
 
@@ -430,12 +468,12 @@ class LongitudinalMpc:
     x_lead = clip(x_lead, min_x_lead, 1e8)
     v_lead = clip(v_lead, 0.0, 1e8)
     a_lead = clip(a_lead, -10., 5.)
-    # Apply smoothing filters to lead predictions
+    # Apply smoothing filters with interp scaling
     self.lead_a_filter.update(a_lead)
     self.lead_v_filter.update(v_lead)
     a_lead = self.lead_a_filter.x
     v_lead = self.lead_v_filter.x
-    lead_xv = self.extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau)
+    lead_xv = self.extrapolate_lead(x_lead, v_lead, a_lead, a_lead_tau, v_ego)
     return lead_xv
 
   def set_accel_limits(self, min_a, max_a):
@@ -449,7 +487,7 @@ class LongitudinalMpc:
     self.status = lead_one.status and tracking_lead or lead_two.status
 
     lead_xv_0 = self.process_lead(lead_one, tracking_lead)
-    lead_xv_1 = self.process_lead(lead_two)
+    lead_xv_1 = self.process_lead(lead_two, v_ego)
 
     # To estimate a safe distance from a moving lead, we calculate how much stopping
     # distance that lead needs as a minimum. We can add that to the current distance

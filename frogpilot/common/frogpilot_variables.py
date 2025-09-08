@@ -44,7 +44,7 @@ THRESHOLD = 0.63                          # Requires the condition to be true fo
 
 def scale_threshold(v_ego):#0   40    60    80   100       0    40    60   80   100
   # More aggressive with hysteresis and lead probability: faster activation at higher speeds
-  return np.interp(v_ego, [0, 17.9, 26.8, 35.8, 44.7], [0.58, 0.60, 0.62, 0.7, 0.8])
+  return np.interp(v_ego, [0, 17.9, 26.8, 35.8, 44.7], [0.58, 0.60, 0.62, 0.8, 0.9])
 
 NON_DRIVING_GEARS = [GearShifter.neutral, GearShifter.park, GearShifter.reverse, GearShifter.unknown]
 
