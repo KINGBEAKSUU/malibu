@@ -587,6 +587,8 @@ class Controls:
   def state_transition(self, CS):
     """Compute conditional state transitions and execute actions on state transitions"""
 
+    savedVEGO = CS.vEgo
+
     self.v_cruise_helper.update_v_cruise(CS, self.enabled, self.is_metric, self.sm['frogpilotPlan'].speedLimitChanged, self.frogpilot_toggles)
 
 
@@ -596,10 +598,10 @@ class Controls:
 
     # NDA Camera Warning - 1Hz frequency limited to prevent blocking
     current_time = time.monotonic()
-    if current_time - self.last_nda_camera_warn_time >= 0.8:  # 1Hz = 1 second interval
-      if CS.vEgo * CV.MS_TO_KPH > (apply_limit_speed * 0.85 ) and left_dist > 2.0:
+    if savedVEGO * CV.MS_TO_KPH > (apply_limit_speed * 0.5 ) and left_dist > 2.0:
+      if current_time - self.last_nda_camera_warn_time >= 0.8:  # 0.8 second interval
         self.events.add(EventName.ndaCameraWarn)
-      self.last_nda_camera_warn_time = current_time
+        self.last_nda_camera_warn_time = current_time
 
 
     # self.traffic_signal_check_timer += DT_CTRL
@@ -616,7 +618,7 @@ class Controls:
     if apply_limit_speed >= 20:
       self.v_cruise_kph_limit = min(apply_limit_speed, self.v_cruise_helper.v_cruise_kph)
 
-      if CS.vEgo * CV.MS_TO_KPH > apply_limit_speed:
+      if savedVEGO * CV.MS_TO_KPH > apply_limit_speed:
       #   self.events.add(EventName.slowingDownSpeedSound)
 
         if not self.slowing_down:
