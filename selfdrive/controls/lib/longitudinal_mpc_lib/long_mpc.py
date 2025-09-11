@@ -68,11 +68,8 @@ DIST_ADAPTS = [0.04, 0.06, 0.06, 0.05]  # Balanced across speeds
 
 # Function to get parameter value based on current speed
 def get_speed_based_param(speed_mph, param_array):
-    """Get parameter value based on current speed using breakpoints"""
-    for i, speed_threshold in enumerate(SPEED_BREAKPOINTS[1:], 1):
-        if speed_mph < speed_threshold:
-            return param_array[i-1]
-    return param_array[-1]  # Return last value for speeds above highest breakpoint
+    """Get parameter value based on current speed using smooth interpolation"""
+    return np.interp(speed_mph, SPEED_BREAKPOINTS, param_array)
 
 # Current active values (set based on speed)
 X_EGO_OBSTACLE_COST = 2.75
@@ -361,33 +358,20 @@ class LongitudinalMpc:
     # Update parameters based on current speed with interpolation for smooth scaling
     speed_mph = v_ego * CV.MS_TO_MPH  # Convert m/s to mph
 
-    # Breakpoints for interpolation: [0, 20, 35]
-    bp = [0, 20, 35]
-    # Original low values
-    low_x_cost = 3.0
-    low_j_cost = 5.0
-    low_a_change_cost = 200
-    low_dist_adapt = 0.0
-    low_lead_filter_time = 0.8  # No smoothing
+    # Use speed-based parameters for smooth scaling across all breakpoints
+    self.current_x_ego_cost = get_speed_based_param(speed_mph, X_EGO_OBSTACLE_COSTS)
+    self.current_j_ego_cost = get_speed_based_param(speed_mph, J_EGO_COSTS)
+    self.current_a_change_cost = get_speed_based_param(speed_mph, A_CHANGE_COSTS)
 
-    # Tuned at 35 mph (index 1 in arrays)
-    tuned_x_cost = X_EGO_OBSTACLE_COSTS[1]
-    tuned_j_cost = J_EGO_COSTS[1]
-    tuned_a_change_cost = A_CHANGE_COSTS[1]
-    tuned_dist_adapt = DIST_ADAPTS[1]
-    tuned_lead_filter_time = 1.0  # Interp to higher
-
-    # Interp for smooth scaling in 20-35 mph
-    self.current_x_ego_cost = interp(speed_mph, bp, [low_x_cost, low_x_cost, tuned_x_cost])
-    self.current_j_ego_cost = interp(speed_mph, bp, [low_j_cost, low_j_cost, tuned_j_cost])
-    self.current_a_change_cost = interp(speed_mph, bp, [low_a_change_cost, low_a_change_cost, tuned_a_change_cost])
-    self.current_dist_adapt = interp(speed_mph, bp, [low_dist_adapt, low_dist_adapt, tuned_dist_adapt])
+    # For dist_adapt, start from 0.0 under low speeds while enabling full smooth transitions
+    dist_adapt_array = [0.0, DIST_ADAPTS[1], DIST_ADAPTS[2], DIST_ADAPTS[3]]
+    self.current_dist_adapt = get_speed_based_param(speed_mph, dist_adapt_array)
 
     # Update filter time constants with interp and recreate filters if needed
-    if speed_mph < 25:
+    if speed_mph < 35:
         self.current_filter_time = 0.0
     else:
-        self.current_filter_time = interp(speed_mph, bp, [low_lead_filter_time, low_lead_filter_time, LEAD_FILTER_TIME_HIGH])
+        self.current_filter_time = interp(speed_mph, [35, 45], [0.0, LEAD_FILTER_TIME_HIGH])
     if abs(self.current_filter_time - getattr(self, 'prev_filter_time', 0)) > 0.1:  # Only update if significant change
       # Recreate filters with new time constant while preserving current values
       current_a = self.lead_a_filter.x if hasattr(self.lead_a_filter, 'x') else 0.0
