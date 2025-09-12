@@ -371,6 +371,21 @@ void SettingsWindow::hideEvent(QHideEvent *event) {
   subSubPanelOpen = false;
 
   updateFrogPilotToggles();
+
+  // Cleanup any open dialogs and widgets to prevent memory leaks on panel close
+  for (QDialog* dialog : findChildren<QDialog*>()) {
+    if (dialog->isVisible()) {
+      dialog->close();
+    }
+    dialog->deleteLater();
+  }
+
+  for (QWidget* widget : findChildren<QWidget*>()) {
+    if (widget->parent() == nullptr && widget->isVisible()) {
+      widget->hide();
+      widget->deleteLater();
+    }
+  }
 }
 
 void SettingsWindow::showEvent(QShowEvent *event) {
@@ -537,6 +552,27 @@ SettingsWindow::SettingsWindow(QWidget *parent) : QFrame(parent) {
 
         subPanelOpen = false;
       }
+
+      int prev_idx = panel_widget->currentIndex();
+      if (prev_idx != -1) {
+        ScrollView* prev_scroll = qobject_cast<ScrollView*>(panel_widget->widget(prev_idx));
+        if (prev_scroll) {
+          QWidget* prev_panel = prev_scroll->widget();
+          for (QDialog* dialog : prev_panel->findChildren<QDialog*>()) {
+            if (dialog->isVisible()) {
+              dialog->close();
+            }
+            dialog->deleteLater();
+          }
+          for (QWidget* widget : prev_panel->findChildren<QWidget*>()) {
+            if (widget->parent() == nullptr && widget->isVisible()) {
+              widget->hide();
+              widget->deleteLater();
+            }
+          }
+        }
+      }
+
       btn->setChecked(true);
       panel_widget->setCurrentWidget(w);
     });

@@ -2,6 +2,7 @@
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.realtime import DT_MDL
 from openpilot.common.numpy_fast import interp
+from openpilot.common.conversions import Conversions as CV
 
 from openpilot.frogpilot.common.frogpilot_variables import CITY_SPEED_LIMIT, CRUISING_SPEED, THRESHOLD, params_memory, scale_threshold
 
@@ -12,7 +13,7 @@ class ConditionalExperimentalMode:
   # FILTER TIME CONSTANTS (Lower = More responsive, Higher = Smoother)
   # [City, Urban Hwy, Rural Hwy, High Speed]
   FILTER_TIME_CURVES = [0.9, 0.8, 0.6, 0.5]    # Faster detection at highway speeds
-  FILTER_TIME_LEADS = [0.9, 0.8, 0.5, 0.5]     # Less sensitive at 70+ mph for slow leads
+  FILTER_TIME_LEADS = [0.9, 0.8, 0.7, 0.5]     # Less sensitive at 70+ mph for slow leads
   FILTER_TIME_LIGHTS = [0.9, 0.8, 0.75, 0.55]  # Less sensitive at 60+ mph for stoplights
 
   # HIGHWAY LIGHT DETECTION MULTIPLIERS
@@ -20,7 +21,7 @@ class ConditionalExperimentalMode:
   LIGHT_BOOSTS = [1.0, 1.2, 1.1, 1.0]         # Keep conservative boost for highest speeds
   LIGHT_SPEED_LOW = 22.2     # 50 mph threshold
   LIGHT_SPEED_HIGH = 26.7    # 60 mph threshold
-  LIGHT_MAX_TIME = 8.5       # Balanced max time preserving city performance
+  LIGHT_MAX_TIME = 9       # Balanced max time preserving city performance
 
   # ===== END TUNING PARAMETERS =====
 
@@ -33,15 +34,8 @@ class ConditionalExperimentalMode:
 
   @staticmethod
   def get_speed_based_param(speed_mph, param_array):
-    """Get parameter value based on current speed using breakpoints [0, 35, 55, 70]"""
-    if speed_mph < 35:
-        return param_array[0]
-    elif speed_mph < 55:
-        return param_array[1]
-    elif speed_mph < 70:
-        return param_array[2]
-    else:
-        return param_array[3]
+    """Get parameter value based on current speed using smooth interpolation between breakpoints [0, 35, 55, 70]"""
+    return interp(speed_mph, [0, 35, 55, 70], param_array)
 
   def __init__(self, FrogPilotPlanner):
     self.frogpilot_planner = FrogPilotPlanner
@@ -154,17 +148,17 @@ class ConditionalExperimentalMode:
 
   def stop_sign_and_light(self, v_ego, sm, model_time):
     if not sm["frogpilotCarState"].trafficModeEnabled:
-      speed_mph = v_ego * 2.23694  # Convert m/s to mph
+      speed_mph = v_ego * CV.MS_TO_MPH  # Convert m/s to mph
 
-      # Interp for smooth scaling in 20-35 mph
-      bp = [0, 20, 35]
-      low_filter_time = 0.8  # Original fixed
-      tuned_filter_time_curves = self.FILTER_TIME_CURVES[1]  # At 35 mph
+      # Interp for smooth scaling in 35-45 mph
+      bp = [0, 35, 45]
+      low_filter_time = 0.0  # No filtering under 35 mph
+      tuned_filter_time_curves = self.FILTER_TIME_CURVES[1]  # At 35-55 mph
       tuned_filter_time_leads = self.FILTER_TIME_LEADS[1]
       tuned_filter_time_lights = self.FILTER_TIME_LIGHTS[1]
       low_boost = 1.0
       tuned_boost = self.LIGHT_BOOSTS[1]
-      low_cap_factor = 0.0  # No cap
+      low_cap_factor = 0.0  # No cap under 35 mph
       tuned_cap_factor = 1.0
 
       filter_time_curves = interp(speed_mph, bp, [low_filter_time, low_filter_time, tuned_filter_time_curves])
