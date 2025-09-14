@@ -241,6 +241,10 @@ class CAR(Platforms):
     [GMCarDocs("Chevrolet Volt 2019")],
     GMCarSpecs(mass=1607, wheelbase=2.69, steerRatio=15.7, centerToFrontRatio=0.45),
   )
+  CADILLAC_XT6 = GMPlatformConfig(
+    [GMCarDocs("Cadillac XT6 2020", "Driver Assist Package")],
+    GMCarSpecs(mass=2050, wheelbase=2.86, steerRatio=16.5, centerToFrontRatio=0.4),
+  )
 
 
 class CruiseButtons:
@@ -327,7 +331,7 @@ CC_ONLY_CAR = {CAR.CHEVROLET_VOLT_CC, CAR.CHEVROLET_BOLT_CC, CAR.CHEVROLET_EQUIN
 # CC_ONLY_CAR = set(c for c in CAR if str(c).endswith('_CC'))
 
 # We're integrated at the Safety Data Gateway Module on these cars
-SDGM_CAR = {CAR.CADILLAC_XT4, CAR.CHEVROLET_TRAVERSE, CAR.BUICK_BABYENCLAVE, CAR.CHEVROLET_VOLT_2019}
+SDGM_CAR = {CAR.CADILLAC_XT4, CAR.CADILLAC_XT6, CAR.CHEVROLET_TRAVERSE, CAR.BUICK_BABYENCLAVE, CAR.CHEVROLET_VOLT_2019}
 
 ASCM_INT = {CAR.CHEVROLET_VOLT_ASCM}
 
