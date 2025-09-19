@@ -127,6 +127,7 @@ class CarInterface(CarInterfaceBase):
         # Use C9 brake bit only on SDGM variants that lack 0xBE (ECMAcceleratorPos)
         if ACCELERATOR_POS_MSG not in fingerprint[CanBus.POWERTRAIN]:
           ret.safetyConfigs[0].safetyParam |= Panda.FLAG_GM_FORCE_BRAKE_C9
+          ret.flags |= GMFlags.FORCE_BRAKE_C9.value
         ret.minEnableSpeed = -1.  # engage speed is decided by pcm
         ret.minSteerSpeed = 7 * CV.MPH_TO_MS
       elif candidate in ASCM_INT:
